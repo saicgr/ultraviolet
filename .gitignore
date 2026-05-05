@@ -1,0 +1,40 @@
+# Build artifacts
+/bin/
+*.test
+*.out
+coverage.txt
+
+# Go
+vendor/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Env (NEVER commit secrets)
+.env
+.env.local
+.env.test
+*-key.json
+*.pem
+!.env.test.example
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Swarm worktrees + logs (regenerable). Keep .swarm/manifest.schema.json + archive/.gitkeep.
+.swarm/worktrees/
+.swarm/logs/*
+!.swarm/logs/.gitkeep
+.swarm/manifest-*.json
+
+# Test scratch
+/tmp/
+*.log
+
+# LocalStack volume
+.localstack/

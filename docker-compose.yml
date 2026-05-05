@@ -1,0 +1,122 @@
+# Ultraviolet dev environment
+# Starts: Postgres (control plane), Redis (pubsub + freshness cache), LocalStack (S3 emulator),
+# and stubs for the three UV binaries (proxy, api, sync) + frontend dev server.
+#
+# Usage: `make dev` (starts only postgres+redis+localstack), or `docker compose up`.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: uv-postgres
+    environment:
+      POSTGRES_USER: uv
+      POSTGRES_PASSWORD: uv
+      POSTGRES_DB: uv
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uv -d uv"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: uv-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  localstack:
+    image: localstack/localstack:3
+    container_name: uv-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: s3
+      DEBUG: 0
+      AWS_DEFAULT_REGION: us-east-1
+    volumes:
+      - localstack-data:/var/lib/localstack
+
+  # ---- Phase 1 binaries (uncomment as each lands) ----
+
+  # uv-proxy:
+  #   build:
+  #     context: .
+  #     dockerfile: cmd/proxy/Dockerfile
+  #   container_name: uv-proxy
+  #   ports:
+  #     - "5000:5432"   # host 5000 to avoid clash with postgres on 5432
+  #                     #   psql -h localhost -p 5000 -U <api_key> -d <customer>_<warehouse>
+  #   environment:
+  #     DATABASE_URL: postgres://uv:uv@postgres:5432/uv
+  #     REDIS_URL: redis://redis:6379
+  #     S3_ENDPOINT: http://localstack:4566
+  #     S3_BUCKET: uv-data-dev
+  #     UV_DEV_TLS: "true"
+  #     UV_LOG_LEVEL: debug
+  #     UV_LOG_FORMAT: pretty
+  #     ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+  #     JWT_SECRET: dev-jwt-secret-change-me
+  #   depends_on:
+  #     postgres: { condition: service_healthy }
+  #     redis:    { condition: service_healthy }
+
+  # uv-api:
+  #   build:
+  #     context: .
+  #     dockerfile: cmd/api/Dockerfile
+  #   container_name: uv-api
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     DATABASE_URL: postgres://uv:uv@postgres:5432/uv
+  #     REDIS_URL: redis://redis:6379
+  #     ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+  #     JWT_SECRET: dev-jwt-secret-change-me
+  #   depends_on:
+  #     postgres: { condition: service_healthy }
+
+  # uv-sync:
+  #   build:
+  #     context: .
+  #     dockerfile: cmd/sync/Dockerfile
+  #   container_name: uv-sync
+  #   environment:
+  #     DATABASE_URL: postgres://uv:uv@postgres:5432/uv
+  #     REDIS_URL: redis://redis:6379
+  #     S3_ENDPOINT: http://localstack:4566
+  #     S3_BUCKET: uv-data-dev
+  #     ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+  #   depends_on:
+  #     postgres: { condition: service_healthy }
+  #     redis:    { condition: service_healthy }
+  #     localstack: { condition: service_started }
+
+  # uv-frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile.dev
+  #   container_name: uv-frontend
+  #   ports:
+  #     - "5173:5173"
+  #   volumes:
+  #     - ./frontend:/app
+  #     - /app/node_modules
+  #   environment:
+  #     VITE_API_URL: http://localhost:8080
+  #   command: pnpm dev --host
+
+volumes:
+  postgres-data:
+  redis-data:
+  localstack-data:

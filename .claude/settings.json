@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(go build:*)",
+      "Bash(go vet:*)",
+      "Bash(go test:*)",
+      "Bash(go mod:*)",
+      "Bash(go fmt:*)",
+      "Bash(gofmt:*)",
+      "Bash(golangci-lint:*)",
+      "Bash(make:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker-compose:*)",
+      "Bash(psql:*)",
+      "Bash(migrate:*)",
+      "Bash(sqlc:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm tsc:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(shellcheck:*)",
+      "Bash(ls:*)",
+      "Bash(tree:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git switch:*)",
+      "Bash(git worktree:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE '\\.go\"' ; then path=$(echo \"$CLAUDE_TOOL_INPUT\" | grep -oE '\"file_path\"\\s*:\\s*\"[^\"]+\\.go\"' | grep -oE '\"[^\"]+\\.go\"' | tr -d '\"') ; if [ -n \"$path\" ] && [ -f \"$path\" ] ; then gofmt -w \"$path\" 2>/dev/null || true ; fi ; fi",
+            "description": "Auto-gofmt any Go file after edit"
+          },
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'migrations/[0-9]+_.*\\.up\\.sql' ; then echo 'WARNING: editing a migration file. If this migration has already been applied, add a NEW migration instead. Check migrations/.applied.txt or schema_migrations table.' >&2 ; fi",
+            "description": "Warn on migration file edits"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd=$(echo \"$CLAUDE_TOOL_INPUT\" | grep -oE '\"command\"\\s*:\\s*\"[^\"]*\"' | head -1) ; if echo \"$cmd\" | grep -qE 'rm -rf .*migrations' ; then echo 'BLOCKED: refuse to rm -rf migrations/' >&2 ; exit 2 ; fi ; if echo \"$cmd\" | grep -qE 'git push.*--force.*main' ; then echo 'BLOCKED: force-push to main' >&2 ; exit 2 ; fi",
+            "description": "Block destructive ops on migrations/ and force-push to main"
+          }
+        ]
+      }
+    ]
+  }
+}
