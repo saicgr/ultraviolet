@@ -1,8 +1,8 @@
 # ultraviolet
 
-You are building a production-grade multi-warehouse query proxy called "Prism" (working name). 
+You are building a production-grade multi-warehouse query proxy called "Ultraviolet" (working name). 
 
-Prism sits in front of data warehouses (Snowflake, BigQuery, Databricks) and acts as a transparent Postgres-wire-protocol proxy. It intercepts SQL queries, routes cheap/cacheable queries to managed DuckDB workers instead of the expensive warehouse, and provides warehouse-agnostic AI SQL functions like ai_generate(). The product saves users 70-90% on warehouse costs with zero code changes required in their BI tools or SQL clients.
+Ultraviolet sits in front of data warehouses (Snowflake, BigQuery, Databricks) and acts as a transparent Postgres-wire-protocol proxy. It intercepts SQL queries, routes cheap/cacheable queries to managed DuckDB workers instead of the expensive warehouse, and provides warehouse-agnostic AI SQL functions like ai_generate(). The product saves users 70-90% on warehouse costs with zero code changes required in their BI tools or SQL clients.
 
 ---
 
@@ -56,7 +56,7 @@ read-only query]            write query /
 │               STORAGE LAYER                          │
 │                                                      │
 │  Mode A (managed):  Your S3 bucket                  │
-│    s3://prism-data/{customer_id}/{table_name}/       │
+│    s3://Ultraviolet-data/{customer_id}/{table_name}/       │
 │                                                      │
 │  Mode B (BYOS):     Customer's own S3/GCS bucket    │
 │    Accessed via IAM cross-account role               │
@@ -95,7 +95,7 @@ Requirements:
 - Support TLS (generate self-signed cert for dev, support customer-provided certs for prod)
 
 The connection string a customer uses looks like:
-postgresql://API_KEY@proxy.prism.dev:5432/acme_snowflake
+postgresql://API_KEY@proxy.Ultraviolet.dev:5432/acme_snowflake
 
 File structure:
 /proxy
@@ -141,7 +141,7 @@ Implementation:
 - Iceberg attach syntax:
 ```sql
   -- For S3 (managed mode):
-  ATTACH 's3://prism-data/{customer_id}/{table_name}/' 
+  ATTACH 's3://Ultraviolet-data/{customer_id}/{table_name}/' 
     AS {table_name} (TYPE ICEBERG, ENDPOINT_URL 's3.amazonaws.com');
 
   -- For GCS (BigQuery customers):
@@ -186,11 +186,11 @@ The sync worker keeps Iceberg files on S3 fresh from Snowflake.
 How it works:
 1. When a customer adds a table to sync in the UI, your backend runs:
 ```sql
-   CREATE STREAM prism_stream_{table_name} ON TABLE {schema}.{table_name};
+   CREATE STREAM Ultraviolet_stream_{table_name} ON TABLE {schema}.{table_name};
 ```
 2. A sync worker polls this stream every N seconds (configurable, default 60s):
 ```sql
-   SELECT * FROM prism_stream_{table_name};
+   SELECT * FROM Ultraviolet_stream_{table_name};
 ```
 3. The stream returns rows with system columns: `METADATA$ACTION` (INSERT/DELETE), `METADATA$ISUPDATE`, `METADATA$ROW_ID`
 4. Apply the changes to the Iceberg files:
@@ -357,7 +357,7 @@ Deployment:       Docker Compose (dev), single docker-compose.yml
 ---
 
 ## DIRECTORY STRUCTURE
-/prism
+/Ultraviolet
 /cmd
 /proxy          # main.go for proxy server (port 5432)
 /api            # main.go for REST API server (port 8080)
@@ -385,7 +385,7 @@ Deployment:       Docker Compose (dev), single docker-compose.yml
 
 ```bash
 # Core
-DATABASE_URL=postgres://prism:prism@localhost:5432/prism
+DATABASE_URL=postgres://Ultraviolet:Ultraviolet@localhost:5432/Ultraviolet
 REDIS_URL=redis://localhost:6379
 PORT_PROXY=5432
 PORT_API=8080
@@ -395,7 +395,7 @@ JWT_SECRET=changeme
 AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
-S3_BUCKET=prism-data
+S3_BUCKET=Ultraviolet-data
 
 # LLM (for ai_generate)
 OPENAI_API_KEY=...
@@ -412,10 +412,10 @@ ENCRYPTION_KEY=32-byte-hex-key
 Include a `docker-compose.yml` that starts:
 1. `postgres` — PostgreSQL 16 for control plane
 2. `redis` — Redis 7 for pubsub/cache
-3. `prism-proxy` — the proxy server (built from /cmd/proxy)
-4. `prism-api` — the REST API (built from /cmd/api)
-5. `prism-sync` — the sync worker (built from /cmd/sync)
-6. `prism-frontend` — the React UI (built from /frontend)
+3. `Ultraviolet-proxy` — the proxy server (built from /cmd/proxy)
+4. `Ultraviolet-api` — the REST API (built from /cmd/api)
+5. `Ultraviolet-sync` — the sync worker (built from /cmd/sync)
+6. `Ultraviolet-frontend` — the React UI (built from /frontend)
 7. `localstack` — LocalStack to emulate S3 for local dev
 
 ---
@@ -478,3 +478,14 @@ Start building now. Ask clarifying questions only if a technical decision blocks
 
 That's the full prompt. A few notes on using it effectively with Claude Code:
 When you paste it, Claude Code will likely start with the Postgres wire protocol server first (step 1 in the ordered build list). Let it run through several steps before interrupting — the ordering is deliberate so you get a working proxy quickly before adding complexity. If it gets stuck on the CGo DuckDB bindings (common on Mac M-series), tell it to use marcboeker/go-duckdb and ensure CGo is enabled in the build. For local dev, tell it to use LocalStack for S3 so you don't need real AWS credentials early on.
+
+The smarter approach: build the architecture for three dataabases(bigquery,snowflake,databricks), launch with one
+Design everything as if you're supporting three warehouses from day one. The connector interface, the CDC sync interface, the Iceberg writer — all generic, all pluggable. Write the Snowflake and Databricks connector stubs so the architecture is proven. But only wire up BigQuery end-to-end for launch.
+This means:
+
+Your codebase is multi-warehouse ready from day one (not a rewrite later)
+Your first launch is focused and production-quality
+Adding Snowflake after BigQuery is proven takes 2–3 weeks, not months
+You can honestly tell investors "we support BigQuery today, Snowflake is 3 weeks away, Databricks is 8 weeks away" — and mean it
+
+The one exception: if you personally have a Snowflake customer lined up who will pay you before you write a line of code, build Snowflake first. Let your first paying customer dictate which warehouse you prioritise. That's the only reason to change the order.
