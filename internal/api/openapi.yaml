@@ -1,0 +1,143 @@
+openapi: 3.1.0
+info:
+  title: {{BRAND_NAME}} Control Plane
+  version: 0.1.0
+  description: REST API for the {{BRAND_NAME}} multi-warehouse query proxy.
+servers:
+  - url: http://localhost:8080
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+  /api/v1/customers:
+    get:
+      summary: List customers
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Customer" }
+    post:
+      summary: Create customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug, display_name]
+              properties:
+                slug: { type: string }
+                display_name: { type: string }
+      responses:
+        "201":
+          description: Created
+  /api/v1/customers/{id}/connections:
+    get:
+      summary: List connections
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: OK } }
+    post:
+      summary: Create connection
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [warehouse_type, name, credentials]
+              properties:
+                warehouse_type: { type: string, enum: [bigquery, snowflake, databricks] }
+                name: { type: string }
+                credentials: { type: object }
+                storage_mode: { type: string, enum: [managed, byos] }
+                s3_bucket: { type: string, nullable: true }
+                s3_prefix: { type: string, nullable: true }
+      responses: { "201": { description: Created } }
+  /api/v1/customers/{id}/api-keys:
+    get:
+      summary: List API keys
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: OK } }
+    post:
+      summary: Create API key
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  api_key: { type: string, description: "Plaintext key — shown only on creation" }
+                  key: { $ref: "#/components/schemas/APIKey" }
+  /api/v1/api-keys/{id}:
+    delete:
+      summary: Revoke API key
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "204": { description: No Content } }
+  /api/v1/connections/{id}/synced-tables:
+    get:
+      summary: List synced tables
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: OK } }
+    post:
+      summary: Add synced table
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [schema_name, table_name, sync_mode]
+              properties:
+                schema_name: { type: string }
+                table_name: { type: string }
+                sync_mode: { type: string, enum: [cdc_native, watermark, manual] }
+                watermark_column: { type: string, nullable: true }
+      responses: { "201": { description: Created } }
+  /api/v1/customers/{id}/queries:
+    get:
+      summary: Query analytics (last 24h)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: OK } }
+  /api/v1/customers/{id}/savings:
+    get:
+      summary: Cost-attribution savings (last 30d)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: OK } }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Customer:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        display_name: { type: string }
+        created_at: { type: string, format: date-time }
+    APIKey:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        customer_id: { type: string, format: uuid }
+        key_prefix: { type: string }
+        description: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        last_used_at: { type: string, format: date-time, nullable: true }
+        revoked_at: { type: string, format: date-time, nullable: true }
+security:
+  - bearerAuth: []

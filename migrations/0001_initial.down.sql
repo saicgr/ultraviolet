@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS cost_attribution;
+DROP TABLE IF EXISTS query_log;
+DROP TABLE IF EXISTS sync_jobs;
+DROP TABLE IF EXISTS synced_tables;
+DROP TABLE IF EXISTS api_keys;
+DROP TABLE IF EXISTS connections;
+DROP TABLE IF EXISTS customers;

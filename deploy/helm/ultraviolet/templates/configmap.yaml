@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ultraviolet.fullname" . }}-env
+  labels:
+    {{- include "ultraviolet.labels" . | nindent 4 }}
+data:
+  {{- range $k, $v := .Values.env }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}
+  {{- if .Values.postgres.external }}
+  DATABASE_URL: {{ .Values.postgres.url | quote }}
+  {{- end }}

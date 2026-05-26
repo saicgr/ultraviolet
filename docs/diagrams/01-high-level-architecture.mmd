@@ -1,0 +1,49 @@
+%% Ultraviolet — High-Level Architecture
+%% Multi-warehouse Postgres-wire query proxy that routes cheap reads to
+%% managed DuckDB workers reading Iceberg, and forwards everything else
+%% to Snowflake / BigQuery / Databricks.
+flowchart TB
+    subgraph Clients["BI Tools & SQL Clients"]
+        BI["Looker · Tableau · dbt · Hex · psql"]
+    end
+
+    subgraph Proxy["Proxy Layer (Go, :5432)"]
+        direction TB
+        PG["Wire Protocols<br/>pgwire · ADBC · snowflake-wire"]
+        AI["AI Rewriter<br/>ai_generate() → Path A / B"]
+        RT["Router<br/>DuckDB vs Warehouse vs Hybrid"]
+        PG --> AI --> RT
+    end
+
+    subgraph Exec["Execution"]
+        direction LR
+        DDB["DuckDB Worker Pool<br/>(CGo · Iceberg ext · LLM ext)<br/>per-customer namespace"]
+        CONN["Warehouse Connectors<br/>Snowflake · BigQuery · Databricks"]
+    end
+
+    subgraph Sync["Sync Layer"]
+        CDC["CDC Pollers<br/>SF STREAM · BQ APPENDS · Delta log"]
+        ICE["Iceberg Writer<br/>(atomic snapshots · REST catalog)"]
+        CDC --> ICE
+    end
+
+    subgraph Storage["Storage Layer"]
+        S3["Managed S3 / GCS<br/>or BYOS (cross-acct IAM)"]
+    end
+
+    subgraph Control["Control Plane (:8080)"]
+        API["Go REST API (chi)<br/>+ Postgres 16 (sqlc)"]
+        UI["React + TS + Tailwind + shadcn"]
+        UI --- API
+    end
+
+    BI -->|Postgres wire| Proxy
+    RT -->|cheap / read-only| DDB
+    RT -->|DDL · writes · unsynced| CONN
+    DDB -->|reads Iceberg| S3
+    CONN -.->|source of truth| WH[("Warehouses")]
+    CDC -.->|polls CDC| WH
+    ICE -->|writes parquet + manifests| S3
+    ICE -.->|snapshot pubsub| DDB
+    API <-->|"config · creds (AES-256-GCM)"| Proxy
+    API <-->|sync schedules| Sync

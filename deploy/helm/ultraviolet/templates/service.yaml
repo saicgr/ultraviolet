@@ -1,0 +1,57 @@
+{{- if .Values.proxy.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ultraviolet.fullname" . }}-proxy
+  labels:
+    {{- include "ultraviolet.componentLabels" (merge (dict "component" "proxy") .) | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: pgwire
+      port: {{ .Values.proxy.ports.pgwire }}
+      targetPort: pgwire
+      protocol: TCP
+    - name: health
+      port: {{ .Values.proxy.ports.health }}
+      targetPort: health
+      protocol: TCP
+  selector:
+    {{- include "ultraviolet.componentSelector" (merge (dict "component" "proxy") .) | nindent 4 }}
+{{- end }}
+---
+{{- if .Values.api.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ultraviolet.fullname" . }}-api
+  labels:
+    {{- include "ultraviolet.componentLabels" (merge (dict "component" "api") .) | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.api.ports.http }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "ultraviolet.componentSelector" (merge (dict "component" "api") .) | nindent 4 }}
+{{- end }}
+---
+{{- if .Values.sync.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ultraviolet.fullname" . }}-sync
+  labels:
+    {{- include "ultraviolet.componentLabels" (merge (dict "component" "sync") .) | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: health
+      port: {{ .Values.sync.ports.health }}
+      targetPort: health
+      protocol: TCP
+  selector:
+    {{- include "ultraviolet.componentSelector" (merge (dict "component" "sync") .) | nindent 4 }}
+{{- end }}

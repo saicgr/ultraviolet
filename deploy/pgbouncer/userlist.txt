@@ -1,0 +1,9 @@
+; userlist.txt — pgbouncer credentials.
+; Format: "username" "SCRAM-SHA-256$..." (escaped). Generate with:
+;   psql -c "SELECT usename, passwd FROM pg_shadow WHERE usename='uv';"
+; or, for fresh users:
+;   echo -n "PASSWORD" | openssl passwd -5 -stdin
+;
+; NEVER commit real production hashes — these are dev-only placeholders.
+"uv" "SCRAM-SHA-256$4096:dGVzdHNhbHQ=$placeholderhashforlocaldevonly==:placeholdersignature=="
+"pgbouncer" "SCRAM-SHA-256$4096:YWRtaW5zYWx0$placeholderadminhashforlocaldevonly==:placeholderadminsignature=="

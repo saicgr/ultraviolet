@@ -1,0 +1,55 @@
+%% Ultraviolet — Feature Map
+%% High-level grouping of product capabilities across phases.
+mindmap
+  root((Ultraviolet))
+    Cost Reduction
+      70–90% warehouse cost cut
+      DuckDB caching of hot tables
+      Per-query cost attribution
+      Savings dashboard (estimated vs actual)
+    Zero-Change Compatibility
+      Postgres wire (Phase 1)
+      ADBC (Phase 1.5)
+      Snowflake wire (Phase 2)
+      Works with Looker · Tableau · dbt · Hex · psql
+    Multi-Warehouse
+      Snowflake (gosnowflake)
+      BigQuery (Storage Read API)
+      Databricks (Phase 2)
+      Unified connector interface
+    Iceberg Sync
+      Snowflake STREAM polling
+      BigQuery APPENDS / watermark
+      Databricks Delta-log tail
+      v2 deletion vectors
+      Atomic snapshots
+      REST catalog
+    Storage Modes
+      Managed S3 (uv-data)
+      BYOS (customer S3 / GCS)
+      Cross-account IAM
+    AI SQL
+      ai_generate(prompt, model)
+      Path A — DuckDB llm extension
+      Path B — Batch LLM API
+      OpenAI · Anthropic · Gemini
+    Control Plane
+      React + shadcn UI
+      Onboarding & cred mgmt
+      Sync table config
+      Query analytics
+      Connection-string generator
+    Security
+      AES-256-GCM creds at rest
+      TLS (self-signed dev / BYO prod)
+      API-key auth
+      No plaintext SQL in prod logs
+    Operability
+      zerolog structured logs
+      Per-customer worker pools
+      Goroutine timeouts ≤30s
+      Nightly cost backfill cron
+    Deployment Models
+      SaaS
+      BYOC
+      Self-hosted

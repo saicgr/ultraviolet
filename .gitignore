@@ -3,6 +3,9 @@
 *.test
 *.out
 coverage.txt
+/sync
+/lineage-bot
+/uv-mcp
 
 # Go
 vendor/

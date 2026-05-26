@@ -1,0 +1,71 @@
+{{- if .Values.sync.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ultraviolet.fullname" . }}-sync
+  labels:
+    {{- include "ultraviolet.componentLabels" (merge (dict "component" "sync") .) | nindent 4 }}
+spec:
+  # sync is a singleton worker — running >1 replica would cause duplicate
+  # CDC polls + double-billing in cost backfill. Override with care.
+  replicas: {{ .Values.sync.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "ultraviolet.componentSelector" (merge (dict "component" "sync") .) | nindent 6 }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "ultraviolet.componentSelector" (merge (dict "component" "sync") .) | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "ultraviolet.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: sync
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/usr/local/bin/uv-sync"]
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: health
+              containerPort: {{ .Values.sync.ports.health }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "ultraviolet.fullname" . }}-env
+            - secretRef:
+                name: {{ .Values.existingSecret }}
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.sync.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

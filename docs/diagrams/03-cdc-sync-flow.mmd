@@ -1,0 +1,25 @@
+%% Ultraviolet — CDC Sync Sequence (Snowflake example)
+%% Shows how warehouse changes land in Iceberg and refresh DuckDB workers.
+sequenceDiagram
+    autonumber
+    participant SF as Snowflake
+    participant Sync as Sync Worker (Go)
+    participant Ice as Iceberg Writer
+    participant S3 as S3 / GCS
+    participant Bus as Redis Pub/Sub
+    participant DDB as DuckDB Worker
+
+    loop every N seconds
+        Sync->>SF: SELECT * FROM uv_stream_<table>
+        SF-->>Sync: change rows (INSERT / DELETE / UPDATE)
+        alt has changes
+            Sync->>Ice: append parquet + deletion vectors (v2)
+            Ice->>S3: write data files
+            Ice->>S3: commit new snapshot (atomic)
+            Ice-->>Bus: publish {customer}:{table}:refreshed:{snapshot_id}
+            Bus-->>DDB: refresh event
+            DDB->>DDB: CHECKPOINT + re-ATTACH Iceberg table
+        else no changes
+            Sync-->>Sync: noop, advance watermark
+        end
+    end

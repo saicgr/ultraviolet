@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS query_result_cache;
+DROP TABLE IF EXISTS activity_event;
+DROP TABLE IF EXISTS column_tag;
+DROP TABLE IF EXISTS cost_budget;
+DROP TABLE IF EXISTS share_token;
+DROP TABLE IF EXISTS scheduled_query;
+DROP TABLE IF EXISTS delivery_subscription;
+DROP TABLE IF EXISTS notification;
+DROP TABLE IF EXISTS annotation;
+DROP TABLE IF EXISTS saved_query;

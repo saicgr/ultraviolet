@@ -4,6 +4,43 @@ Items observed during scaffolding that aren't yet committed plans. Triage each b
 
 ---
 
+## Phase-1 deferred (added 2026-05-05 after batches 0–8 implementation pass)
+
+### Completed in fill-in-gaps pass (same day)
+
+- ~~`ai_generate` Path A/B selection~~ — done. Heuristic in `internal/ai/path_b.go::looksScalarOrLimited`; `Rewriter.Rewrite` now logs path A/B; both paths defer to DuckDB `llm` extension. External-API rewrite still future work.
+- ~~DuckDB pool Iceberg pubsub refresh~~ — done. `internal/workers/pool.go::subscribeRefresh` PSUBSCRIBEs to `iceberg.snapshot.{slug}.*` and logs on receipt.
+- ~~Snowflake cost backfill~~ — done. `internal/cost/snowflake_cost.go` reads `ACCOUNT_USAGE.QUERY_HISTORY` via gosnowflake (Snowflake-account-required at runtime).
+- ~~REST API JWT middleware~~ — done. `internal/api/auth.go::authMiddleware` validates HS256 Bearer tokens; dev bypass via `X-UV-Dev-Bypass: 1` header until SSO lands in Phase 1.5.
+- ~~Iceberg writer real-format attempt~~ — done. `internal/iceberg/writer.go` now tries `COPY (...) TO 's3://...' (FORMAT 'iceberg', OVERWRITE_OR_IGNORE TRUE)` first, falls back to Parquet with a loud warning when the extension is unavailable.
+- ~~DuckDB llm extension auto-load~~ — done. `internal/workers/pool.go::installExtensions` adds optional `INSTALL llm FROM community; LOAD llm`.
+- ~~Integration smoke test~~ — done. `test/integration/pgwire_smoke_test.go` connects via real `pgx` driver and verifies `SELECT 1` round-trip without external services.
+- ~~Unit tests for ai/connectors/logger~~ — done.
+
+### Completed in second fill-in-gaps pass (2026-05-07)
+
+- ~~golang-migrate auto-apply~~ — done. `internal/store/migrate.go` + boot-time call in `cmd/proxy` and `cmd/api`. `UV_MIGRATIONS_SOURCE` env override.
+- ~~TLS self-signed cert auto-gen~~ — done. `internal/protocols/pgwire/tls.go::LoadOrGenerateTLS` produces a P-256 in-memory cert when no paths configured; loads files when `TLS_CERT_PATH`/`TLS_KEY_PATH` set. Wired into `cmd/proxy` via `UV_DEV_TLS=true`.
+- ~~ai_generate Path B external providers~~ — done. `internal/ai/provider.go` adds OpenAI + Anthropic HTTP clients; `Rewriter.CompleteOne` returns `ErrNoProvider` when no key, otherwise hits the real API.
+- ~~Snowflake STREAM CDC syncer~~ — done. `internal/sync/snowflake_syncer.go` opens gosnowflake, queries `uv_<schema>_<table>_stream`, appends to Iceberg, publishes pubsub. Returns nil quietly when account unreachable.
+- ~~Per-table CHECKPOINT on pubsub~~ — done. `Pool.subscribeRefresh` issues `CHECKPOINT` on every snapshot event so subsequent ATTACH sees fresh metadata.
+- ~~Production JWT enforcement toggle~~ — done. `UV_API_REQUIRE_AUTH=true` makes missing/invalid Bearer return 401; default false for dev.
+- ~~OpenAPI spec~~ — done. `internal/api/openapi.yaml` embedded; served at `GET /openapi.yaml`. Frontend codegen path is now unblocked.
+- ~~goroutine-leak tests~~ — done. `goleak.VerifyTestMain` in `internal/{ai,router,store}` test packages; passes with `-race`.
+- ~~Iceberg writer atomicity test~~ — done. `internal/iceberg/writer_test.go` verifies fail-closed behavior on invalid source query.
+
+### Still open (deferred to Phase 1.5+)
+
+- **Live-warehouse integration tests** — replace placeholder GCP creds in `.env` and run `test/integration/*` against `bigquery-public-data.samples.shakespeare`.
+- **LocalStack iceberg snapshot end-to-end + pyiceberg cross-read** — sync writer call path executes but no real rows materialize via `read_bigquery(...)` yet; needs the DuckDB BigQuery extension (or an Arrow-bridged temp file).
+- **`ai_generate` Path B SQL rewrite** — provider client exists but the rewriter still passes the SQL through unchanged. Phase 1.5: rewrite `ai_generate(...)` calls to a UV-provided UDF that batches via `Rewriter.CompleteOne`.
+- **SCRAM-SHA-256 auth** — pgwire still cleartext-over-TLS only.
+- **Real Snowflake STREAM row materialization** — current syncer counts STREAM rows but the iceberg `Append` source query is a placeholder; pipe rows through DuckDB.
+- **Gate-agent runs** — invoke `pg-protocol-validator`, `warehouse-connector-tester`, `iceberg-spec-validator`, `security-auditor`, `code-organizer` over the new code.
+- **pg_query_go v5→v6 switch** — v5 fails to compile on macOS Tahoe SDK (`strchrnul` redeclaration). Sticking with v6 for Phase 1.
+
+---
+
 ## Architectural
 
 - **ADBC protocol surface (Phase 1.5)** — design only; Phase 1 ships PG-wire alone. Track when first BI tool customer requests Arrow throughput.

@@ -1,0 +1,70 @@
+{{- if .Values.proxy.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ultraviolet.fullname" . }}-proxy
+  labels:
+    {{- include "ultraviolet.componentLabels" (merge (dict "component" "proxy") .) | nindent 4 }}
+spec:
+  replicas: {{ .Values.proxy.replicaCount | default .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ultraviolet.componentSelector" (merge (dict "component" "proxy") .) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ultraviolet.componentSelector" (merge (dict "component" "proxy") .) | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "ultraviolet.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: proxy
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/usr/local/bin/uv-proxy"]
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: pgwire
+              containerPort: {{ .Values.proxy.ports.pgwire }}
+              protocol: TCP
+            - name: health
+              containerPort: {{ .Values.proxy.ports.health }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "ultraviolet.fullname" . }}-env
+            - secretRef:
+                name: {{ .Values.existingSecret }}
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: health
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.proxy.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

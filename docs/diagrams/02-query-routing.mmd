@@ -1,0 +1,24 @@
+%% Ultraviolet — Query Routing Decision Tree
+%% Implemented in internal/router/. Decides per-query whether the SQL
+%% is served by a DuckDB worker (cheap, Iceberg-backed) or forwarded
+%% to the source warehouse (canonical, expensive).
+flowchart TD
+    Q["Incoming SQL<br/>(parsed via pg_query_go)"] --> AI{"Contains<br/>ai_generate()?"}
+    AI -->|yes| RW["Rewrite to llm_complete()<br/>or batch LLM API"]
+    RW --> DDB["DuckDB Worker"]
+
+    AI -->|no| DDL{"DDL?<br/>CREATE/DROP/ALTER/TRUNCATE"}
+    DDL -->|yes| WH["Warehouse Connector"]
+
+    DDL -->|no| WRITE{"Write?<br/>INSERT/UPDATE/DELETE/MERGE"}
+    WRITE -->|yes| WH
+
+    WRITE -->|no| SYNCED{"All referenced tables<br/>synced to Iceberg?"}
+    SYNCED -->|no| WH
+
+    SYNCED -->|yes| FRESH{"Snapshot fresh?<br/>(< per-table threshold)"}
+    FRESH -->|no| WH
+    FRESH -->|yes| DDB
+
+    DDB --> RESP["Stream rows back as<br/>Postgres DataRow frames"]
+    WH --> RESP

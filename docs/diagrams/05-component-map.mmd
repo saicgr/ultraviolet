@@ -1,0 +1,56 @@
+%% Ultraviolet — Internal Package Map
+%% Mirrors the layout under internal/ and cmd/ — one box per Go package
+%% grouped by responsibility. Use this to orient before editing.
+flowchart LR
+    subgraph cmd["cmd/ entry points"]
+        CP["proxy"]
+        CA["api"]
+        CS["sync"]
+        CU["uv (CLI)"]
+    end
+
+    subgraph proto["Protocols"]
+        P1["protocols/pgwire"]
+        P2["protocols/adbc"]
+        P3["protocols/snowflake-wire"]
+    end
+
+    subgraph core["Core Engine"]
+        R["router"]
+        AI["ai"]
+        W["workers (DuckDB pool)"]
+        C["connectors"]
+    end
+
+    subgraph data["Data Plane"]
+        SY["sync"]
+        IC["iceberg"]
+        CO["cost"]
+    end
+
+    subgraph ctrl["Control Plane"]
+        AP["api"]
+        ST["store (sqlc + migrations)"]
+        FE["frontend (React)"]
+    end
+
+    subgraph cross["Cross-Cutting"]
+        CFG["config"]
+        LOG["logger"]
+        SEC["security / auth"]
+    end
+
+    CP --> P1 --> R
+    CP --> P2 --> R
+    CP --> P3 --> R
+    R --> AI
+    R --> W
+    R --> C
+    CS --> SY --> IC
+    SY --> CO
+    W --> IC
+    CA --> AP --> ST
+    AP --> FE
+    core -.uses.-> cross
+    data -.uses.-> cross
+    ctrl -.uses.-> cross

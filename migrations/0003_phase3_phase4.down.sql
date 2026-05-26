@@ -1,0 +1,14 @@
+DROP TABLE IF EXISTS dq_result;
+DROP TABLE IF EXISTS reverse_etl_destination;
+DROP TABLE IF EXISTS plan_subscription;
+DROP TABLE IF EXISTS usage_event;
+DROP TABLE IF EXISTS sso_config;
+DROP TABLE IF EXISTS audit_log;
+DROP TABLE IF EXISTS workspace_membership;
+DROP TABLE IF EXISTS app_user;
+DROP TABLE IF EXISTS workspace;
+DROP TABLE IF EXISTS alert_rule;
+DROP TABLE IF EXISTS dashboard;
+DROP TABLE IF EXISTS semantic_model;
+DROP TABLE IF EXISTS table_metadata;
+DROP TABLE IF EXISTS lineage_edge;

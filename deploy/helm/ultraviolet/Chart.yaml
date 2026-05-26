@@ -1,0 +1,17 @@
+apiVersion: v2
+name: ultraviolet
+description: Ultraviolet — multi-warehouse Postgres-wire query proxy (proxy + api + sync).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - postgres
+  - data
+  - warehouse
+  - iceberg
+  - duckdb
+home: https://github.com/ultraviolet-dev/ultraviolet
+sources:
+  - https://github.com/ultraviolet-dev/ultraviolet
+maintainers:
+  - name: Ultraviolet

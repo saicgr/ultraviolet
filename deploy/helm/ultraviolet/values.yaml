@@ -1,0 +1,109 @@
+# Default values for ultraviolet.
+# Override per-environment with `helm install -f my-values.yaml ...`.
+
+image:
+  repository: ghcr.io/ultraviolet-dev/ultraviolet
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# Each of the three binaries (proxy, api, sync) has its own Deployment +
+# Service so they can be scaled independently. replicaCount applies to all
+# three unless overridden in the per-binary block below.
+replicaCount: 1
+
+proxy:
+  enabled: true
+  replicaCount: 2
+  ports:
+    pgwire: 5432
+    health: 8082
+  resources:
+    limits:
+      cpu: "2"
+      memory: "2Gi"
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+
+api:
+  enabled: true
+  replicaCount: 2
+  ports:
+    http: 8080
+  resources:
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+
+sync:
+  enabled: true
+  replicaCount: 1
+  ports:
+    health: 8081
+  resources:
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+
+# Control-plane Postgres. In production point this at a managed RDS / Cloud
+# SQL instance — the bundled subchart is for dev only.
+postgres:
+  # If true, the chart expects a sibling Postgres deployment / external
+  # service. The DATABASE_URL below should resolve to it.
+  external: true
+  url: "postgres://uv:uv@postgres:5432/uv?sslmode=disable"
+
+# Ingress for the api binary. Disabled by default; turn on per env.
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+  hosts:
+    - host: api.ultraviolet.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Arbitrary environment variables threaded into every Deployment via the
+# ConfigMap. Sensitive values (ENCRYPTION_KEY, warehouse creds) should be
+# pulled from a Secret instead — see templates/configmap.yaml.
+env:
+  UV_LOG_LEVEL: "info"
+  UV_LOG_FORMAT: "json"
+  UV_PROXY_PORT: "5432"
+  UV_API_PORT: "8080"
+  UV_SYNC_HEALTH_PORT: "8081"
+  UV_PROXY_HEALTH_PORT: "8082"
+  OTEL_EXPORTER_OTLP_ENDPOINT: ""
+
+# Existing Kubernetes Secret holding ENCRYPTION_KEY (32-byte hex) and any
+# warehouse credentials. Required.
+existingSecret: "ultraviolet-secrets"
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  readOnlyRootFilesystem: true
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

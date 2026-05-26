@@ -1,0 +1,53 @@
+name: lineage-pr-check
+# Fires on: PR open, every push to PR, manual re-run.
+# Posts (or edits) a single PR comment with impact analysis. The dedup is done
+# by `cmd/lineage-bot` via the <!-- uv-lineage-bot:v1 --> marker, so this
+# workflow can run as often as it wants without spamming the thread.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  impact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Build lineage-bot CLI
+        run: go build -o ./bin/lineage-bot-cli ./cmd/lineage-bot-cli
+
+      - name: Compute diff vs base
+        id: diff
+        run: |
+          git fetch origin "${{ github.event.pull_request.base.ref }}" --depth=1
+          DIFF="$(git diff "origin/${{ github.event.pull_request.base.ref }}"...HEAD -- '*.sql' '*.yaml' '*.yml' '*.go')"
+          {
+            echo "diff<<UV_EOF"
+            echo "$DIFF"
+            echo "UV_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run impact analysis
+        env:
+          UV_API_URL: ${{ secrets.UV_API_URL }}
+          UV_TOKEN:   ${{ secrets.UV_API_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER:    ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA:  ${{ github.event.pull_request.head.sha }}
+          PR_REPO:      ${{ github.repository }}
+          PR_DIFF:      ${{ steps.diff.outputs.diff }}
+        run: ./bin/lineage-bot-cli analyze-pr
