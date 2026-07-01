@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/components/ui.tsx","./src/lib/api.ts","./src/lib/cn.ts","./src/lib/customer.ts","./src/pages/apikeys.tsx","./src/pages/connectionstring.tsx","./src/pages/connections.tsx","./src/pages/dashboard.tsx","./src/pages/queries.tsx","./src/pages/sync.tsx"],"version":"5.9.3"}

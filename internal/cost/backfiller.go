@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/ultraviolet-dev/ultraviolet/internal/config"
+	"github.com/ultraviolet-dev/ultraviolet/internal/costest"
 	"github.com/ultraviolet-dev/ultraviolet/internal/store"
 )
 
@@ -25,8 +26,9 @@ type Backfiller struct {
 	enc *store.Encryptor
 	log zerolog.Logger
 
-	bq *BigQueryCost
-	sf *SnowflakeCost
+	bq  *BigQueryCost
+	sf  *SnowflakeCost
+	est *costest.Estimator
 }
 
 func New(cfg *config.Config, db *store.DB, enc *store.Encryptor, log zerolog.Logger) *Backfiller {
@@ -35,6 +37,7 @@ func New(cfg *config.Config, db *store.DB, enc *store.Encryptor, log zerolog.Log
 		log: log.With().Str("component", "cost-backfiller").Logger(),
 		bq:  &BigQueryCost{db: db, enc: enc},
 		sf:  &SnowflakeCost{db: db, enc: enc, USDPerTiB: cfg.SnowflakeUSDPerTiB},
+		est: costest.New(db, cfg.BigQueryUSDPerTiB, cfg.SnowflakeUSDPerTiB),
 	}
 }
 
@@ -135,6 +138,75 @@ func (b *Backfiller) backfillCustomer(ctx context.Context, customerID uuid.UUID)
 			`UPDATE query_log SET actual_cost_usd = $1 WHERE id = $2`, costUSD, p.id)
 	}
 
+	// Fill estimated_cost_usd (warehouse-equivalent) for any row still missing
+	// it BEFORE rolling up, so the savings = estimated − actual math is real.
+	// This is the warehouse-equivalent estimate even for DuckDB-routed queries
+	// (that estimate is precisely the saving).
+	if err := b.backfillEstimatedCost(ctx, customerID); err != nil {
+		b.log.Warn().Err(err).Msg("estimated cost backfill")
+	}
+
+	return b.rollup(ctx, customerID)
+}
+
+// backfillEstimatedCost populates query_log.estimated_cost_usd (the
+// warehouse-equivalent cost) for rows that lack it, using the shared costest
+// estimator over the stored normalized_sql. Runs off the hot path (the proxy
+// must never touch Postgres for this — see internal/router/CLAUDE.md), here on
+// the nightly/on-demand backfill tick. Without this, estimated_cost is NULL and
+// the savings calculation has nothing to subtract from.
+func (b *Backfiller) backfillEstimatedCost(ctx context.Context, customerID uuid.UUID) error {
+	rows, err := b.db.Pool().Query(ctx,
+		`SELECT q.id, q.normalized_sql, COALESCE(c.warehouse_type, '')
+		 FROM query_log q
+		 LEFT JOIN connections c ON c.id = q.connection_id
+		 WHERE q.customer_id = $1 AND q.estimated_cost_usd IS NULL
+		   AND q.route_decision <> 'error'
+		   AND q.started_at > now() - interval '24 hours'
+		 ORDER BY q.started_at DESC LIMIT 2000`, customerID)
+	if err != nil {
+		return err
+	}
+	type pendingEst struct {
+		id        uuid.UUID
+		sql       string
+		warehouse string
+	}
+	var todo []pendingEst
+	for rows.Next() {
+		var p pendingEst
+		if err := rows.Scan(&p.id, &p.sql, &p.warehouse); err != nil {
+			rows.Close()
+			return err
+		}
+		todo = append(todo, p)
+	}
+	rows.Close()
+
+	for _, p := range todo {
+		warehouse := p.warehouse
+		if warehouse == "" {
+			warehouse = "bigquery" // rate-only default; bytes drive the figure
+		}
+		_, cost, _, err := b.est.EstimateSQL(ctx, customerID, warehouse, p.sql)
+		if err != nil {
+			b.log.Debug().Err(err).Str("id", p.id.String()).Msg("estimate")
+			continue
+		}
+		_, _ = b.db.Pool().Exec(ctx,
+			`UPDATE query_log SET estimated_cost_usd = $1 WHERE id = $2`, cost, p.id)
+	}
+	return nil
+}
+
+// RollupCustomer fills any missing estimated costs then rolls today's
+// query_log activity into cost_attribution for a single customer. Exposed for
+// on-demand callers (the in-app Workbench rolls up immediately after a run so
+// the savings dashboard reflects real activity without waiting for the cron).
+func (b *Backfiller) RollupCustomer(ctx context.Context, customerID uuid.UUID) error {
+	if err := b.backfillEstimatedCost(ctx, customerID); err != nil {
+		b.log.Warn().Err(err).Msg("estimated cost backfill (on-demand)")
+	}
 	return b.rollup(ctx, customerID)
 }
 
@@ -145,13 +217,24 @@ func (b *Backfiller) rollup(ctx context.Context, customerID uuid.UUID) error {
 		return err
 	}
 	for _, c := range conns {
+		// Cost model (docs/architecture/cost-attribution.md, saved = estimated −
+		// actual):
+		//   warehouse_cost = actual paid on the warehouse (warehouse+fallback rows)
+		//   duckdb_cost    = actual cost of DuckDB-routed queries (≈0; we don't
+		//                    bill DuckDB, so actual_cost stays NULL→0 for them)
+		//   savings        = warehouse-EQUIVALENT estimate of the DuckDB-routed
+		//                    queries minus what they actually cost. Previously
+		//                    duckdb_cost and savings both read the SAME
+		//                    estimated-cost sum, so savings was wrong and equal
+		//                    to duckdb_cost — fixed here.
 		row := b.db.Pool().QueryRow(ctx,
 			`SELECT
 			   COUNT(*),
 			   COUNT(*) FILTER (WHERE route_decision = 'duckdb'),
 			   COALESCE(SUM(actual_cost_usd) FILTER (WHERE route_decision IN ('warehouse','fallback')), 0),
-			   COALESCE(SUM(estimated_cost_usd) FILTER (WHERE route_decision = 'duckdb'), 0),
+			   COALESCE(SUM(actual_cost_usd) FILTER (WHERE route_decision = 'duckdb'), 0),
 			   COALESCE(SUM(estimated_cost_usd) FILTER (WHERE route_decision = 'duckdb'), 0)
+			     - COALESCE(SUM(actual_cost_usd) FILTER (WHERE route_decision = 'duckdb'), 0)
 			 FROM query_log
 			 WHERE customer_id = $1 AND connection_id = $2
 			   AND started_at >= date_trunc('day', now())`, customerID, c.ID)

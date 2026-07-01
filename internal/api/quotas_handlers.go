@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/ultraviolet-dev/ultraviolet/internal/costest"
 	"github.com/ultraviolet-dev/ultraviolet/internal/quotas"
 )
 
@@ -66,12 +67,17 @@ func (s *Server) scheduleSuggest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bytes, warehouse, unknown, err := s.estimateScannedBytes(r.Context(), cid, body.SQL)
+	warehouse, err := s.primaryWarehouseFor(r.Context(), cid)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
 		return
 	}
-	cost := costForBytes(warehouse, bytes)
+	bytes, cost, unknown, err := costest.New(s.db, s.cfg.BigQueryUSDPerTiB, s.cfg.SnowflakeUSDPerTiB).
+		EstimateSQL(r.Context(), cid, warehouse, body.SQL)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
 
 	q := quotas.New(s.db.Pool())
 	allowed, reason, err := q.Check(r.Context(), cid, body.UserSlug, cost)

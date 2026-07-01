@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Route, Routes, useLocation } from "react-router-dom";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Dashboard } from "./pages/Dashboard";
 import { Connections } from "./pages/Connections";
 import { Sync } from "./pages/Sync";
@@ -30,6 +31,8 @@ import { AccessReviews } from "./pages/AccessReviews";
 import { Copilot } from "./pages/Copilot";
 import { Narrator } from "./pages/Narrator";
 import { Watches } from "./pages/Watches";
+import { PullRequests } from "./pages/PullRequests";
+import { GitHubApp } from "./pages/GitHubApp";
 import { CommandPalette } from "./components/CommandPalette";
 import { cn } from "./lib/cn";
 import { BRANDING } from "./branding";
@@ -71,36 +74,50 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const nav = [
-    { to: "/", label: t("nav.savings") },
-    { to: "/connections", label: t("nav.connections") },
-    { to: "/sync", label: t("nav.sync") },
-    { to: "/queries", label: t("nav.queries") },
-    { to: "/catalog", label: t("nav.catalog") },
-    { to: "/lineage", label: t("nav.lineage") },
-    { to: "/dashboards", label: t("nav.dashboards") },
-    { to: "/workbench", label: t("nav.workbench") },
-    { to: "/impact", label: t("nav.impact") },
-    { to: "/agents", label: t("nav.agents") },
-    { to: "/activity", label: t("nav.activity") },
-    { to: "/inbox", label: t("nav.inbox") },
-    { to: "/subscriptions", label: t("nav.subscriptions") },
-    { to: "/webhooks", label: t("nav.webhooks") },
-    { to: "/scheduled-queries", label: t("nav.scheduled_queries") },
-    { to: "/access-reviews", label: t("nav.access_reviews") },
-    { to: "/copilot", label: t("nav.copilot") },
-    { to: "/narrator", label: t("nav.narrator") },
-    { to: "/watches", label: t("nav.watches") },
-    { to: "/catalog/hover", label: "Catalog Hover" },
-    { to: "/semantic-search", label: "Semantic Search" },
-    { to: "/quotas", label: "Quotas" },
-    { to: "/approvals", label: "Approvals" },
-    { to: "/schema-diff", label: "Schema Diff" },
-    { to: "/sync-dag", label: "Sync DAG" },
-    { to: "/dashboard-versions", label: "Dashboard Versions" },
-    { to: "/cost-preflight", label: "Cost Preflight" },
-    { to: "/api-keys", label: t("nav.api_keys") },
-    { to: "/connection-string", label: t("nav.connect") },
+  // The 5 JUUL "Foundational" features are grouped at the top; everything else
+  // stays in an un-headed section below so existing muscle memory is preserved.
+  const sections = [
+    {
+      heading: t("nav.foundational"),
+      items: [
+        { to: "/", label: t("nav.cost_optimization") },
+        { to: "/dashboards", label: t("nav.dashboards") },
+        { to: "/lineage", label: t("nav.lineage") },
+        { to: "/pull-requests", label: t("nav.pull_requests") },
+        { to: "/github", label: t("nav.github_app") },
+      ],
+    },
+    {
+      heading: null as string | null,
+      items: [
+        { to: "/connections", label: t("nav.connections") },
+        { to: "/sync", label: t("nav.sync") },
+        { to: "/queries", label: t("nav.queries") },
+        { to: "/catalog", label: t("nav.catalog") },
+        { to: "/workbench", label: t("nav.workbench") },
+        { to: "/impact", label: t("nav.impact") },
+        { to: "/agents", label: t("nav.agents") },
+        { to: "/activity", label: t("nav.activity") },
+        { to: "/inbox", label: t("nav.inbox") },
+        { to: "/subscriptions", label: t("nav.subscriptions") },
+        { to: "/webhooks", label: t("nav.webhooks") },
+        { to: "/scheduled-queries", label: t("nav.scheduled_queries") },
+        { to: "/access-reviews", label: t("nav.access_reviews") },
+        { to: "/copilot", label: t("nav.copilot") },
+        { to: "/narrator", label: t("nav.narrator") },
+        { to: "/watches", label: t("nav.watches") },
+        { to: "/catalog/hover", label: "Catalog Hover" },
+        { to: "/semantic-search", label: "Semantic Search" },
+        { to: "/quotas", label: "Quotas" },
+        { to: "/approvals", label: "Approvals" },
+        { to: "/schema-diff", label: "Schema Diff" },
+        { to: "/sync-dag", label: "Sync DAG" },
+        { to: "/dashboard-versions", label: "Dashboard Versions" },
+        { to: "/cost-preflight", label: "Cost Preflight" },
+        { to: "/api-keys", label: t("nav.api_keys") },
+        { to: "/connection-string", label: t("nav.connect") },
+      ],
+    },
   ];
 
   return (
@@ -111,17 +128,26 @@ export default function App() {
           {BRANDING.name}
         </div>
         <nav className="space-y-1">
-          {nav.map((n) => (
-            <Link
-              key={n.to}
-              to={n.to}
-              className={cn(
-                "block px-3 py-2 rounded-md text-sm hover:bg-muted",
-                loc.pathname === n.to && "bg-muted font-medium",
+          {sections.map((section, si) => (
+            <div key={si} className={cn(si > 0 && "pt-3")}>
+              {section.heading && (
+                <div className="px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-foreground/50">
+                  {section.heading}
+                </div>
               )}
-            >
-              {n.label}
-            </Link>
+              {section.items.map((n) => (
+                <Link
+                  key={n.to}
+                  to={n.to}
+                  className={cn(
+                    "block px-3 py-2 rounded-md text-sm hover:bg-muted",
+                    loc.pathname === n.to && "bg-muted font-medium",
+                  )}
+                >
+                  {n.label}
+                </Link>
+              ))}
+            </div>
           ))}
         </nav>
       </aside>
@@ -136,6 +162,7 @@ export default function App() {
           </button>
           <LocaleSwitcher />
         </header>
+        <ErrorBoundary resetKey={loc.pathname}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/connections" element={<Connections />} />
@@ -167,7 +194,10 @@ export default function App() {
           <Route path="/copilot" element={<Copilot />} />
           <Route path="/narrator" element={<Narrator />} />
           <Route path="/watches" element={<Watches />} />
+          <Route path="/pull-requests" element={<PullRequests />} />
+          <Route path="/github" element={<GitHubApp />} />
         </Routes>
+        </ErrorBoundary>
       </main>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>

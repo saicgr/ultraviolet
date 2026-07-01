@@ -1,0 +1,117 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]: Ultraviolet
+    - navigation [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e9]: Foundational
+        - link "Cost Optimization" [ref=e10] [cursor=pointer]:
+          - /url: /
+        - link "Dashboards" [ref=e11] [cursor=pointer]:
+          - /url: /dashboards
+        - link "Lineage" [ref=e12] [cursor=pointer]:
+          - /url: /lineage
+        - link "Pull Requests" [ref=e13] [cursor=pointer]:
+          - /url: /pull-requests
+        - link "GitHub App" [ref=e14] [cursor=pointer]:
+          - /url: /github
+      - generic [ref=e15]:
+        - link "Connections" [ref=e16] [cursor=pointer]:
+          - /url: /connections
+        - link "Sync" [ref=e17] [cursor=pointer]:
+          - /url: /sync
+        - link "Queries" [ref=e18] [cursor=pointer]:
+          - /url: /queries
+        - link "Catalog" [ref=e19] [cursor=pointer]:
+          - /url: /catalog
+        - link "Workbench" [ref=e20] [cursor=pointer]:
+          - /url: /workbench
+        - link "Impact" [ref=e21] [cursor=pointer]:
+          - /url: /impact
+        - link "Agents" [ref=e22] [cursor=pointer]:
+          - /url: /agents
+        - link "Activity" [ref=e23] [cursor=pointer]:
+          - /url: /activity
+        - link "Inbox" [ref=e24] [cursor=pointer]:
+          - /url: /inbox
+        - link "Subscriptions" [ref=e25] [cursor=pointer]:
+          - /url: /subscriptions
+        - link "Webhooks" [ref=e26] [cursor=pointer]:
+          - /url: /webhooks
+        - link "Scheduled Queries" [ref=e27] [cursor=pointer]:
+          - /url: /scheduled-queries
+        - link "Access Reviews" [ref=e28] [cursor=pointer]:
+          - /url: /access-reviews
+        - link "Copilot" [ref=e29] [cursor=pointer]:
+          - /url: /copilot
+        - link "Narrator" [ref=e30] [cursor=pointer]:
+          - /url: /narrator
+        - link "Lineage Watches" [ref=e31] [cursor=pointer]:
+          - /url: /watches
+        - link "Catalog Hover" [ref=e32] [cursor=pointer]:
+          - /url: /catalog/hover
+        - link "Semantic Search" [ref=e33] [cursor=pointer]:
+          - /url: /semantic-search
+        - link "Quotas" [ref=e34] [cursor=pointer]:
+          - /url: /quotas
+        - link "Approvals" [ref=e35] [cursor=pointer]:
+          - /url: /approvals
+        - link "Schema Diff" [ref=e36] [cursor=pointer]:
+          - /url: /schema-diff
+        - link "Sync DAG" [ref=e37] [cursor=pointer]:
+          - /url: /sync-dag
+        - link "Dashboard Versions" [ref=e38] [cursor=pointer]:
+          - /url: /dashboard-versions
+        - link "Cost Preflight" [ref=e39] [cursor=pointer]:
+          - /url: /cost-preflight
+        - link "API Keys" [ref=e40] [cursor=pointer]:
+          - /url: /api-keys
+        - link "Connect" [ref=e41] [cursor=pointer]:
+          - /url: /connection-string
+  - main [ref=e42]:
+    - generic [ref=e43]:
+      - button "Open command palette" [ref=e44] [cursor=pointer]: Search… ⌘K
+      - combobox "Locale" [ref=e45]:
+        - option "English" [selected]
+        - option "Español"
+        - option "Français"
+        - option "Deutsch"
+        - option "日本語"
+    - generic [ref=e46]:
+      - heading "Pull Requests" [level=1] [ref=e47]
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - heading "Analyzed pull requests" [level=2] [ref=e50]
+          - paragraph [ref=e51]: Impact + data-quality analysis posted to GitHub on each PR.
+        - table [ref=e52]:
+          - rowgroup [ref=e53]:
+            - row "Repo PR Commit Impacted DQ Conclusion Analyzed" [ref=e54]:
+              - columnheader "Repo" [ref=e55]
+              - columnheader "PR" [ref=e56]
+              - columnheader "Commit" [ref=e57]
+              - columnheader "Impacted" [ref=e58]
+              - columnheader "DQ" [ref=e59]
+              - columnheader "Conclusion" [ref=e60]
+              - columnheader "Analyzed" [ref=e61]
+          - rowgroup [ref=e62]:
+            - 'row "acme-labs/warehouse-dbt #42 a1b2c3d 2 failing action required 6/3/2026, 2:16:25 PM" [ref=e63] [cursor=pointer]':
+              - cell "acme-labs/warehouse-dbt" [ref=e64]
+              - cell "#42" [ref=e65]:
+                - button "#42" [ref=e66]
+              - cell "a1b2c3d" [ref=e67]
+              - cell "2" [ref=e68]
+              - cell "failing" [ref=e69]:
+                - generic [ref=e70]: failing
+              - cell "action required" [ref=e71]:
+                - generic [ref=e72]: action required
+              - cell "6/3/2026, 2:16:25 PM" [ref=e73]
+            - 'row "acme-labs/warehouse-dbt #41 e5f6a7b 1 none neutral 6/3/2026, 2:16:25 PM" [ref=e74] [cursor=pointer]':
+              - cell "acme-labs/warehouse-dbt" [ref=e75]
+              - cell "#41" [ref=e76]:
+                - button "#41" [ref=e77]
+              - cell "e5f6a7b" [ref=e78]
+              - cell "1" [ref=e79]
+              - cell "none" [ref=e80]:
+                - generic [ref=e81]: none
+              - cell "neutral" [ref=e82]:
+                - generic [ref=e83]: neutral
+              - cell "6/3/2026, 2:16:25 PM" [ref=e84]

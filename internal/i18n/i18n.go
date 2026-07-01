@@ -41,3 +41,22 @@ func T(locale, key string) string {
 
 // Locales returns the supported list. Drives the language picker.
 func Locales() []string { return []string{"en", "de", "es", "fr", "ja"} }
+
+// Messages returns every key→text for a locale (falling back to en per key).
+// Backs GET /api/v1/i18n/{locale}/messages.json so the frontend's remote
+// dictionary fetch resolves to a 200 instead of a 404.
+func Messages(locale string) map[string]string {
+	locale = strings.ToLower(strings.SplitN(locale, "-", 2)[0])
+	if locale == "" {
+		locale = "en"
+	}
+	out := make(map[string]string, len(dict))
+	for key, entry := range dict {
+		if v, ok := entry[locale]; ok {
+			out[key] = v
+		} else if v, ok := entry["en"]; ok {
+			out[key] = v
+		}
+	}
+	return out
+}

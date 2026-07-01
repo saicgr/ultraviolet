@@ -24,7 +24,7 @@ export function Subscriptions() {
   const [dashboardId, setDashboardId] = useState("");
   const [email, setEmail] = useState("");
   const [cron, setCron] = useState("0 9 * * 1");
-  const [format, setFormat] = useState("pdf");
+  const [channel, setChannel] = useState("email");
 
   const dashboards = useQuery({
     queryKey: ["dashboards", cid],
@@ -38,18 +38,19 @@ export function Subscriptions() {
   });
 
   const create = useMutation({
-    mutationFn: () => api.createSubscription(dashboardId, { email, cron, format }),
+    mutationFn: () =>
+      api.createSubscription(dashboardId, { user_email: email, schedule_cron: cron, channel }),
     onSuccess: () => {
       setEmail("");
       qc.invalidateQueries({ queryKey: ["subscriptions", dashboardId] });
     },
   });
   const del = useMutation({
-    mutationFn: (id: string) => api.deleteSubscription(dashboardId, id),
+    mutationFn: (id: string) => api.deleteSubscription(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["subscriptions", dashboardId] }),
   });
   const test = useMutation({
-    mutationFn: (id: string) => api.testSendSubscription(dashboardId, id),
+    mutationFn: (id: string) => api.testSendSubscription(id),
   });
 
   return (
@@ -83,12 +84,12 @@ export function Subscriptions() {
               <Input placeholder="cron e.g. 0 9 * * 1" value={cron} onChange={(e) => setCron(e.target.value)} />
               <select
                 className="h-10 rounded-md border border-border bg-background px-3 text-sm"
-                value={format}
-                onChange={(e) => setFormat(e.target.value)}
+                value={channel}
+                onChange={(e) => setChannel(e.target.value)}
               >
-                <option value="pdf">PDF</option>
-                <option value="png">PNG</option>
-                <option value="csv">CSV</option>
+                <option value="email">Email</option>
+                <option value="slack">Slack</option>
+                <option value="webhook">Webhook</option>
               </select>
             </div>
             <div className="mt-3">
@@ -104,13 +105,13 @@ export function Subscriptions() {
             {subs.data && subs.data.length === 0 && <EmptyState title="No subscriptions yet" />}
             {subs.data && subs.data.length > 0 && (
               <Table>
-                <THead><TR><TH>Email</TH><TH>Cron</TH><TH>Format</TH><TH /></TR></THead>
+                <THead><TR><TH>Address</TH><TH>Cron</TH><TH>Channel</TH><TH /></TR></THead>
                 <tbody>
                   {subs.data.map((s) => (
                     <TR key={s.id}>
-                      <TD>{s.email}</TD>
-                      <TD className="font-mono">{s.cron}</TD>
-                      <TD>{s.format}</TD>
+                      <TD>{s.address}</TD>
+                      <TD className="font-mono">{s.schedule_cron}</TD>
+                      <TD>{s.channel}</TD>
                       <TD>
                         <div className="flex gap-2">
                           <Button size="sm" variant="outline" onClick={() => test.mutate(s.id)} disabled={test.isPending}>Test send</Button>

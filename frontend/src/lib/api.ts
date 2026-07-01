@@ -65,7 +65,69 @@ export interface LineageEdge {
   upstream_fqn: string;
   downstream_fqn: string;
   edge_type: string;
+  origin?: string;     // "runtime" | "source_code"
+  confidence?: string; // "exact" | "ambiguous" | "table_only"
   query_hash: string;
+}
+
+// W1 recursive lineage graph (GET /lineage/graph)
+export interface LineageGraphNode {
+  id: string;
+  fqn: string;
+  kind: string; // "table" | "column"
+  depth: number;
+  is_root: boolean;
+}
+export interface LineageGraphEdge {
+  source: string;
+  target: string;
+  edge_type: string;
+  origin: string;     // "runtime" | "source_code"
+  confidence: string; // "exact" | "ambiguous" | "table_only"
+}
+export interface LineageGraph {
+  root: string;
+  direction: string;
+  granularity: string;
+  depth: number;
+  truncated: boolean;
+  nodes: LineageGraphNode[];
+  edges: LineageGraphEdge[];
+}
+
+// W2 PR analysis history
+export interface PRAnalysisRow {
+  id: number;
+  repo: string;
+  pr_number: number;
+  head_sha: string;
+  pull_request_url: string;
+  conclusion: string; // success | neutral | action_required
+  impacted_count: number;
+  dq_impact: "none" | "touched" | "failing";
+  created_at: string;
+}
+export interface PRAnalysisDetail extends PRAnalysisRow {
+  changes: { Kind: string; FQN: string; Detail?: string }[];
+  hits: { FQN: string; Hops: number; Why: string; Severity: string }[];
+  dq_refs: { table_fqn: string; status: string }[];
+}
+
+// W2 GitHub App settings
+export interface GitHubInstallInfo {
+  install_url: string;
+  installed: boolean;
+}
+export interface GitHubInstallation {
+  installation_id: number;
+  account_login: string;
+  suspended: boolean;
+}
+export interface GitHubRepo {
+  repo_id: number;
+  full_name: string;
+  installation_id: number;
+  connected: boolean;
 }
 
 export interface CatalogRow {
@@ -145,10 +207,24 @@ export interface DashboardVersion {
 }
 
 export interface CostPreflight {
-  estimated_bytes: number;
+  estimated_bytes_scanned: number;
   estimated_cost_usd: number;
-  would_block: boolean;
-  reason: string | null;
+  warehouse: string;
+  would_block_if_over_budget: boolean;
+  budget_reason?: string;
+  unknown_tables?: string[];
+}
+
+export interface WorkbenchResult {
+  columns: string[];
+  rows: string[][];
+  row_count: number;
+  truncated: boolean;
+  route: string;
+  duration_ms: number;
+  bytes_scanned: number;
+  estimated_cost_usd: number;
+  hint?: string;
 }
 
 export interface SemanticHit {
@@ -177,11 +253,12 @@ export interface InboxItem {
 
 export interface DashboardSubscription {
   id: string;
-  dashboard_id: string;
-  email: string;
-  cron: string;
-  format: string;
-  created_at: string;
+  customer_id: string;
+  target_id: string;
+  schedule_cron: string;
+  channel: string;
+  address: string;
+  enabled: boolean;
 }
 
 export interface Webhook {
@@ -309,12 +386,27 @@ export const api = {
     request<LineageEdge[]>("GET", `/lineage/upstream?fqn=${encodeURIComponent(fqn)}`),
   lineageDownstream: (fqn: string) =>
     request<LineageEdge[]>("GET", `/lineage/downstream?fqn=${encodeURIComponent(fqn)}`),
+  lineageGraph: (p: { fqn: string; depth?: number; direction?: string; granularity?: string }) =>
+    request<LineageGraph>(
+      "GET",
+      `/lineage/graph?fqn=${encodeURIComponent(p.fqn)}&depth=${p.depth ?? 3}` +
+        `&direction=${p.direction ?? "both"}&granularity=${p.granularity ?? "table"}`,
+    ),
+  listPRAnalysis: () => request<PRAnalysisRow[]>("GET", `/pr-analysis`),
+  getPRAnalysis: (id: number) => request<PRAnalysisDetail>("GET", `/pr-analysis/${id}`),
+  githubInstallInfo: () => request<GitHubInstallInfo>("GET", `/github/install-info`),
+  listGitHubInstallations: () => request<GitHubInstallation[]>("GET", `/github/installations`),
+  listGitHubRepos: () => request<GitHubRepo[]>("GET", `/github/repos`),
+  connectGitHubRepo: (repo_full_name: string) =>
+    request<{ connected: boolean }>("POST", `/github/connect`, { repo_full_name }),
+  disconnectGitHubRepo: (repo_full_name: string) =>
+    request<{ connected: boolean }>("POST", `/github/disconnect`, { repo_full_name }),
   catalogSearch: (q: string) =>
     request<CatalogRow[]>("GET", `/catalog/search?q=${encodeURIComponent(q)}`),
   listDashboards: (customerId: string) =>
     request<DashboardSummary[]>("GET", `/customers/${customerId}/dashboards`),
   workbenchRun: (sql: string) =>
-    request<{ rows: unknown[] }>("POST", `/workbench/run`, { sql }),
+    request<WorkbenchResult>("POST", `/workbench/run`, { sql }),
   impactPreview: (body: { kind: string; fqn: string }) =>
     request<ImpactHit[]>("POST", `/impact/preview`, body),
   listAgents: () => request<{ name: string; kind: string }[]>("GET", `/agents`),
@@ -381,20 +473,17 @@ export const api = {
     ),
   createSubscription: (
     dashboardId: string,
-    body: { email: string; cron: string; format: string },
+    body: { user_email: string; schedule_cron: string; channel?: string },
   ) =>
-    request<DashboardSubscription>(
+    request<{ id: string }>(
       "POST",
       `/dashboards/${dashboardId}/subscriptions`,
       body,
     ),
-  deleteSubscription: (dashboardId: string, id: string) =>
-    request<void>("DELETE", `/dashboards/${dashboardId}/subscriptions/${id}`),
-  testSendSubscription: (dashboardId: string, id: string) =>
-    request<{ sent: boolean }>(
-      "POST",
-      `/dashboards/${dashboardId}/subscriptions/${id}/test-send`,
-    ),
+  deleteSubscription: (id: string) =>
+    request<void>("DELETE", `/subscriptions/${id}`),
+  testSendSubscription: (id: string) =>
+    request<{ sent: boolean }>("POST", `/subscriptions/${id}/test-send`),
 
   listWebhooks: (customerId: string) =>
     request<Webhook[]>("GET", `/webhooks?customer_id=${encodeURIComponent(customerId)}`),

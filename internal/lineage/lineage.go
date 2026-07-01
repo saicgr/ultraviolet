@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	pg_query "github.com/pganalyze/pg_query_go/v6"
 
+	"github.com/ultraviolet-dev/ultraviolet/internal/metrics"
 	"github.com/ultraviolet-dev/ultraviolet/internal/router"
 )
 
@@ -23,6 +24,8 @@ type Edge struct {
 	UpstreamFQN   string
 	DownstreamFQN string
 	EdgeType      string // "table" | "column"
+	Origin        string // "runtime" | "source_code"
+	Confidence    string // "exact" | "ambiguous" | "table_only"
 	QueryHash     string
 }
 
@@ -35,15 +38,45 @@ func NewExtractor() *Extractor { return &Extractor{} }
 
 func (e *Extractor) Extract(sql string) []Edge {
 	hash := QueryHash(sql)
-	tree, err := pg_query.Parse(sql)
+	tree, err := pg_query.Parse(normalizeDialect(sql))
 	if err != nil {
+		// pg_query is a Postgres-dialect parser; BigQuery/Snowflake constructs
+		// (STRUCT<>, UNNEST, QUALIFY, LATERAL FLATTEN, …) it can't represent are
+		// counted, not silently swallowed, so the under-count is observable
+		// (see docs/process/no-fallback-data.md). Both wired warehouses are
+		// non-Postgres, so this matters.
+		metrics.Inc("uv_lineage_parse_failure_total", nil)
 		return nil
 	}
 	var edges []Edge
 	for _, stmt := range tree.Stmts {
 		edges = append(edges, edgesFromStmt(stmt.Stmt, hash)...)
 	}
-	return dedupeEdges(edges)
+	edges = dedupeEdges(edges)
+	// Default the evidence origin + binding confidence for any edge that didn't
+	// set them (table edges, and runtime-observed edges). The source-code path
+	// retags origin afterwards.
+	for i := range edges {
+		if edges[i].Origin == "" {
+			edges[i].Origin = "runtime"
+		}
+		if edges[i].Confidence == "" {
+			edges[i].Confidence = confExact
+		}
+	}
+	return edges
+}
+
+// normalizeDialect rewrites the handful of non-Postgres tokens that are safe to
+// translate so more warehouse SQL parses. Conservative on purpose: only
+// backtick-quoting (BigQuery identifiers) is rewritten — aggressive regex
+// surgery on STRUCT<>/QUALIFY risks corrupting the SQL, so those remain a
+// counted parse failure rather than a silently mangled parse.
+func normalizeDialect(sql string) string {
+	if !strings.ContainsRune(sql, '`') {
+		return sql
+	}
+	return strings.ReplaceAll(sql, "`", `"`)
 }
 
 func edgesFromStmt(node *pg_query.Node, hash string) []Edge {
@@ -68,6 +101,22 @@ func edgesFromStmt(node *pg_query.Node, hash string) []Edge {
 		downstream := fqn(cts.Into.Rel.Schemaname, cts.Into.Rel.Relname)
 		return edgesFromSelect(cts.Query, downstream, hash)
 	}
+	// CREATE [OR REPLACE] VIEW v AS SELECT … — views are the backbone of dbt/BI
+	// graphs; the view name is the downstream node, its SELECT body the upstream.
+	if vs := node.GetViewStmt(); vs != nil && vs.View != nil {
+		downstream := fqn(vs.View.Schemaname, vs.View.Relname)
+		return edgesFromSelect(vs.Query, downstream, hash)
+	}
+	// MERGE INTO target USING source … — the ETL upsert. Target is downstream;
+	// the source relation (table or subquery) feeds it. Treat like UPDATE…FROM.
+	if mg := node.GetMergeStmt(); mg != nil && mg.Relation != nil {
+		downstream := fqn(mg.Relation.Schemaname, mg.Relation.Relname)
+		var out []Edge
+		for _, t := range router.ExtractTables(stringifyNode(mg.SourceRelation)) {
+			out = append(out, Edge{UpstreamFQN: fqn(t.Schema, t.Table), DownstreamFQN: downstream, EdgeType: "table", QueryHash: hash})
+		}
+		return out
+	}
 	return nil
 }
 
@@ -82,6 +131,9 @@ func edgesFromSelect(node *pg_query.Node, downstream, hash string) []Edge {
 			QueryHash:     hash,
 		})
 	}
+	// Column-granularity edges (upstream col → downstream col) layered on top of
+	// the table edges. Both granularities coexist in lineage_edge.
+	out = append(out, resolveColumns(node, downstream, hash)...)
 	return out
 }
 
@@ -145,12 +197,22 @@ func (w *Writer) Write(ctx context.Context, customerID uuid.UUID, edges []Edge) 
 	}
 	now := time.Now()
 	for _, e := range edges {
+		origin := e.Origin
+		if origin == "" {
+			origin = "runtime"
+		}
+		confidence := e.Confidence
+		if confidence == "" {
+			confidence = confExact
+		}
 		_, err := w.pool.Exec(ctx, `
-			INSERT INTO lineage_edge (customer_id, upstream_fqn, downstream_fqn, edge_type, query_hash, last_seen_at, seen_count)
-			VALUES ($1,$2,$3,$4,$5,$6,1)
-			ON CONFLICT (customer_id, upstream_fqn, downstream_fqn, edge_type)
-			DO UPDATE SET last_seen_at = EXCLUDED.last_seen_at, seen_count = lineage_edge.seen_count + 1`,
-			customerID, e.UpstreamFQN, e.DownstreamFQN, e.EdgeType, e.QueryHash, now)
+			INSERT INTO lineage_edge (customer_id, upstream_fqn, downstream_fqn, edge_type, origin, confidence, query_hash, last_seen_at, seen_count)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,1)
+			ON CONFLICT (customer_id, upstream_fqn, downstream_fqn, edge_type, origin)
+			DO UPDATE SET last_seen_at = EXCLUDED.last_seen_at,
+			              confidence = EXCLUDED.confidence,
+			              seen_count = lineage_edge.seen_count + 1`,
+			customerID, e.UpstreamFQN, e.DownstreamFQN, e.EdgeType, origin, confidence, e.QueryHash, now)
 		if err != nil {
 			return err
 		}
@@ -161,7 +223,7 @@ func (w *Writer) Write(ctx context.Context, customerID uuid.UUID, edges []Edge) 
 // Lookup returns upstream edges for an FQN (what does X depend on?).
 func (w *Writer) Upstream(ctx context.Context, customerID uuid.UUID, fqn string) ([]Edge, error) {
 	rows, err := w.pool.Query(ctx,
-		`SELECT upstream_fqn, downstream_fqn, edge_type, query_hash
+		`SELECT upstream_fqn, downstream_fqn, edge_type, origin, confidence, query_hash
 		 FROM lineage_edge WHERE customer_id = $1 AND downstream_fqn = $2`, customerID, fqn)
 	if err != nil {
 		return nil, err
@@ -170,7 +232,7 @@ func (w *Writer) Upstream(ctx context.Context, customerID uuid.UUID, fqn string)
 	var out []Edge
 	for rows.Next() {
 		var e Edge
-		if err := rows.Scan(&e.UpstreamFQN, &e.DownstreamFQN, &e.EdgeType, &e.QueryHash); err != nil {
+		if err := rows.Scan(&e.UpstreamFQN, &e.DownstreamFQN, &e.EdgeType, &e.Origin, &e.Confidence, &e.QueryHash); err != nil {
 			return nil, err
 		}
 		out = append(out, e)
@@ -180,7 +242,7 @@ func (w *Writer) Upstream(ctx context.Context, customerID uuid.UUID, fqn string)
 
 func (w *Writer) Downstream(ctx context.Context, customerID uuid.UUID, fqn string) ([]Edge, error) {
 	rows, err := w.pool.Query(ctx,
-		`SELECT upstream_fqn, downstream_fqn, edge_type, query_hash
+		`SELECT upstream_fqn, downstream_fqn, edge_type, origin, confidence, query_hash
 		 FROM lineage_edge WHERE customer_id = $1 AND upstream_fqn = $2`, customerID, fqn)
 	if err != nil {
 		return nil, err
@@ -189,7 +251,7 @@ func (w *Writer) Downstream(ctx context.Context, customerID uuid.UUID, fqn strin
 	var out []Edge
 	for rows.Next() {
 		var e Edge
-		if err := rows.Scan(&e.UpstreamFQN, &e.DownstreamFQN, &e.EdgeType, &e.QueryHash); err != nil {
+		if err := rows.Scan(&e.UpstreamFQN, &e.DownstreamFQN, &e.EdgeType, &e.Origin, &e.Confidence, &e.QueryHash); err != nil {
 			return nil, err
 		}
 		out = append(out, e)

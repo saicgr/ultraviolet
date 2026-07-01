@@ -39,11 +39,26 @@ type Server struct {
 	// udfs is the optional per-workspace UDF registry (pu-2). nil disables
 	// the /udfs surface (503).
 	udfs *workers.UDFRegistry
+	// queryRunner executes Workbench SQL on a real DuckDB worker pool. nil in the
+	// plain control-plane (the proxy owns the pool); the demo wires a
+	// *workers.Pool so the in-app Workbench runs real queries and logs them.
+	queryRunner QueryRunner
+}
+
+// QueryRunner runs ad-hoc SQL on the DuckDB engine and returns string-encoded
+// columns/rows, the row count, and the bytes produced. *workers.Pool satisfies
+// it directly (its ExecuteRows method matches this signature).
+type QueryRunner interface {
+	ExecuteRows(ctx context.Context, customerSlug, query string) (cols []string, rows [][]string, rowCount int64, bytesScanned int64, err error)
 }
 
 // SetRewriter wires the optional LLM client used by AI endpoints. Safe to call
 // before ListenAndServe; nil leaves AI endpoints disabled (503).
 func (s *Server) SetRewriter(r *ai.Rewriter) { s.rewriter = r }
+
+// SetQueryRunner wires a real DuckDB executor for the Workbench. nil leaves the
+// Workbench in stub mode (returns the psql connect hint).
+func (s *Server) SetQueryRunner(qr QueryRunner) { s.queryRunner = qr }
 
 func New(cfg *config.Config, db *store.DB, enc *store.Encryptor, log zerolog.Logger) *Server {
 	return &Server{
@@ -89,6 +104,17 @@ func (s *Server) Routes() http.Handler {
 		// Phase-3 surface
 		r.Get("/lineage/upstream", s.lineageUpstream)
 		r.Get("/lineage/downstream", s.lineageDownstream)
+		r.Get("/lineage/graph", s.lineageGraph)
+		// W2 GitHub App settings + PR analysis history
+		r.Get("/github/install-info", s.githubInstallInfo)
+		r.Get("/github/setup", s.githubSetupCallback)
+		r.Get("/github/installations", s.listGitHubInstallations)
+		r.Get("/github/repos", s.listGitHubRepos)
+		r.Post("/github/connect", s.connectGitHubRepo)
+		r.Post("/github/disconnect", s.disconnectGitHubRepo)
+		r.Get("/pr-analysis", s.listPRAnalysis)
+		r.Get("/pr-analysis/{id}", s.getPRAnalysis)
+		r.Get("/i18n/{locale}/messages.json", s.i18nMessages)
 		r.Get("/catalog/search", s.catalogSearch)
 		r.Get("/customers/{id}/dashboards", s.listDashboards)
 		r.Post("/customers/{id}/dashboards", s.createDashboard)

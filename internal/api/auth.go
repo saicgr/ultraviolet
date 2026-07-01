@@ -44,8 +44,23 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		// Dev bypass — see Phase 1.5 plan in IMPROVEMENTS.md to flip the default.
-		if v := r.Header.Get("X-UV-Dev-Bypass"); v == "1" {
+		// GitHub's post-install redirect lands here without a Bearer token; it
+		// carries its own ?installation_id and resolves the active customer.
+		if r.URL.Path == "/api/v1/github/setup" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// Localization bundle is public (no tenant data) — the frontend fetches it
+		// before any auth flow, so don't require a token even when auth is on.
+		if strings.HasPrefix(r.URL.Path, "/api/v1/i18n/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// Dev bypass — local-only escape hatch so the React frontend can talk to
+		// the API without an auth flow. HARD-DISABLED in production: config.Load
+		// forces APIRequireAuth and refuses weak secrets when UV_PROD=true, and
+		// the header is ignored here regardless of what a caller sends.
+		if !s.cfg.Prod && r.Header.Get("X-UV-Dev-Bypass") == "1" {
 			next.ServeHTTP(w, r)
 			return
 		}

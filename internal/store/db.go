@@ -340,6 +340,8 @@ type QueryLogEntry struct {
 	CustomerID       uuid.UUID
 	ConnectionID     *uuid.UUID
 	APIKeyID         *uuid.UUID
+	UserID           *uuid.UUID // app_user that ran the query, when known (dashboard/user-scoped paths)
+	DashboardID      *uuid.UUID // dashboard the query served, when known
 	QueryHash        string
 	NormalizedSQL    string
 	RouteDecision    string
@@ -353,11 +355,13 @@ type QueryLogEntry struct {
 
 func (db *DB) InsertQueryLog(ctx context.Context, e QueryLogEntry) error {
 	_, err := db.pool.Exec(ctx,
-		`INSERT INTO query_log (customer_id, connection_id, api_key_id, query_hash, normalized_sql,
+		`INSERT INTO query_log (customer_id, connection_id, api_key_id, user_id, dashboard_id,
+		                        query_hash, normalized_sql,
 		                        route_decision, fallback_reason, duration_ms, rows_returned, bytes_scanned,
 		                        estimated_cost_usd, error_code)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-		e.CustomerID, e.ConnectionID, e.APIKeyID, e.QueryHash, e.NormalizedSQL,
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+		e.CustomerID, e.ConnectionID, e.APIKeyID, e.UserID, e.DashboardID,
+		e.QueryHash, e.NormalizedSQL,
 		e.RouteDecision, e.FallbackReason, e.DurationMS, e.RowsReturned, e.BytesScanned,
 		e.EstimatedCostUSD, e.ErrorCode)
 	return err

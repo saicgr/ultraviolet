@@ -119,9 +119,10 @@ func (s *Server) deleteAnnotation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Authorization: requesting principal must be the author, or admin.
-	// Admin check is the dev-bypass header pending real RBAC (Phase 2).
+	// Admin check is the dev-bypass header pending real RBAC (Phase 2); it is
+	// ignored in production (UV_PROD=true), same as api.authMiddleware.
 	caller := UserIDFromContext(r.Context())
-	isAdmin := r.Header.Get("X-UV-Dev-Bypass") == "1"
+	isAdmin := !s.cfg.Prod && r.Header.Get("X-UV-Dev-Bypass") == "1"
 	if !isAdmin && (author == nil || *author != caller) {
 		writeErr(w, http.StatusForbidden, fmt.Errorf("only the author or an admin may revoke this annotation"))
 		return

@@ -1,0 +1,119 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]: Ultraviolet
+    - navigation [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e9]: Foundational
+        - link "Cost Optimization" [ref=e10] [cursor=pointer]:
+          - /url: /
+        - link "Dashboards" [ref=e11] [cursor=pointer]:
+          - /url: /dashboards
+        - link "Lineage" [ref=e12] [cursor=pointer]:
+          - /url: /lineage
+        - link "Pull Requests" [ref=e13] [cursor=pointer]:
+          - /url: /pull-requests
+        - link "GitHub App" [ref=e14] [cursor=pointer]:
+          - /url: /github
+      - generic [ref=e15]:
+        - link "Connections" [ref=e16] [cursor=pointer]:
+          - /url: /connections
+        - link "Sync" [ref=e17] [cursor=pointer]:
+          - /url: /sync
+        - link "Queries" [ref=e18] [cursor=pointer]:
+          - /url: /queries
+        - link "Catalog" [ref=e19] [cursor=pointer]:
+          - /url: /catalog
+        - link "Workbench" [ref=e20] [cursor=pointer]:
+          - /url: /workbench
+        - link "Impact" [ref=e21] [cursor=pointer]:
+          - /url: /impact
+        - link "Agents" [ref=e22] [cursor=pointer]:
+          - /url: /agents
+        - link "Activity" [ref=e23] [cursor=pointer]:
+          - /url: /activity
+        - link "Inbox" [ref=e24] [cursor=pointer]:
+          - /url: /inbox
+        - link "Subscriptions" [ref=e25] [cursor=pointer]:
+          - /url: /subscriptions
+        - link "Webhooks" [ref=e26] [cursor=pointer]:
+          - /url: /webhooks
+        - link "Scheduled Queries" [ref=e27] [cursor=pointer]:
+          - /url: /scheduled-queries
+        - link "Access Reviews" [ref=e28] [cursor=pointer]:
+          - /url: /access-reviews
+        - link "Copilot" [ref=e29] [cursor=pointer]:
+          - /url: /copilot
+        - link "Narrator" [ref=e30] [cursor=pointer]:
+          - /url: /narrator
+        - link "Lineage Watches" [ref=e31] [cursor=pointer]:
+          - /url: /watches
+        - link "Catalog Hover" [ref=e32] [cursor=pointer]:
+          - /url: /catalog/hover
+        - link "Semantic Search" [ref=e33] [cursor=pointer]:
+          - /url: /semantic-search
+        - link "Quotas" [ref=e34] [cursor=pointer]:
+          - /url: /quotas
+        - link "Approvals" [ref=e35] [cursor=pointer]:
+          - /url: /approvals
+        - link "Schema Diff" [ref=e36] [cursor=pointer]:
+          - /url: /schema-diff
+        - link "Sync DAG" [ref=e37] [cursor=pointer]:
+          - /url: /sync-dag
+        - link "Dashboard Versions" [ref=e38] [cursor=pointer]:
+          - /url: /dashboard-versions
+        - link "Cost Preflight" [ref=e39] [cursor=pointer]:
+          - /url: /cost-preflight
+        - link "API Keys" [ref=e40] [cursor=pointer]:
+          - /url: /api-keys
+        - link "Connect" [ref=e41] [cursor=pointer]:
+          - /url: /connection-string
+  - main [ref=e42]:
+    - generic [ref=e43]:
+      - button "Open command palette" [ref=e44] [cursor=pointer]: Search… ⌘K
+      - combobox "Locale" [ref=e45]:
+        - option "English" [selected]
+        - option "Español"
+        - option "Français"
+        - option "Deutsch"
+        - option "日本語"
+    - generic [ref=e46]:
+      - heading "Lineage" [level=1] [ref=e47]
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - heading "Find a table" [level=2] [ref=e50]
+          - paragraph [ref=e51]: Enter the fully-qualified name (schema.table).
+        - textbox "e.g. analytics.top_words" [ref=e52]: marts.exec_summary.volume
+      - generic [ref=e53]:
+        - generic [ref=e54]:
+          - heading "Lineage graph" [level=2] [ref=e55]
+          - paragraph [ref=e56]: Click any node to re-root. Toggle table vs column granularity.
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - group "Direction" [ref=e59]:
+              - button "upstream" [ref=e60] [cursor=pointer]
+              - button "downstream" [ref=e61] [cursor=pointer]
+              - button "both" [ref=e62] [cursor=pointer]
+            - group "Granularity" [ref=e63]:
+              - button "table" [ref=e64] [cursor=pointer]
+              - button "column" [ref=e65] [cursor=pointer]
+            - generic [ref=e66]:
+              - text: "Depth: 3"
+              - slider "Graph depth" [ref=e67]: "3"
+            - generic [ref=e68]:
+              - generic [ref=e69]:
+                - img [ref=e70]
+                - text: runtime
+              - generic [ref=e71]:
+                - img [ref=e72]
+                - text: source-code
+          - img "Lineage graph rooted at marts.exec_summary.volume" [ref=e147]:
+            - button "Re-root at samples.shakespeare.word_count" [ref=e148] [cursor=pointer]:
+              - generic [ref=e150]: …ples.shakespeare.word_count
+            - button "Re-root at marts.exec_summary.volume" [ref=e151] [cursor=pointer]:
+              - generic [ref=e153]: marts.exec_summary.volume
+            - button "Re-root at analytics.top_words.freq" [ref=e154] [cursor=pointer]:
+              - generic [ref=e156]: analytics.top_words.freq
+            - button "Re-root at analytics.word_report.freq" [ref=e157] [cursor=pointer]:
+              - generic [ref=e159]: analytics.word_report.freq
+          - paragraph [ref=e160]: Graph truncated at depth 3; increase depth to see more.
+        - button "Show table view (accessible fallback)" [ref=e87] [cursor=pointer]

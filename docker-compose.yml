@@ -116,6 +116,23 @@ services:
   #     VITE_API_URL: http://localhost:8080
   #   command: pnpm dev --host
 
+  # uv-lineage-bot:           # GitHub App webhook receiver (W2)
+  #   build:
+  #     context: .
+  #     dockerfile: cmd/lineage-bot/Dockerfile
+  #   container_name: uv-lineage-bot
+  #   ports:
+  #     - "8090:8090"
+  #   environment:
+  #     DATABASE_URL: postgres://uv:uv@postgres:5432/uv
+  #     UV_LINEAGE_BOT_PORT: "8090"
+  #     UV_GITHUB_APP_ID: "${UV_GITHUB_APP_ID}"
+  #     UV_GITHUB_APP_SLUG: "${UV_GITHUB_APP_SLUG}"
+  #     UV_GITHUB_PRIVATE_KEY: "${UV_GITHUB_PRIVATE_KEY}"
+  #     UV_GITHUB_WEBHOOK_SECRET: "${UV_GITHUB_WEBHOOK_SECRET}"  # REQUIRED — bot refuses to boot without it
+  #   depends_on:
+  #     postgres: { condition: service_healthy }
+
 volumes:
   postgres-data:
   redis-data:

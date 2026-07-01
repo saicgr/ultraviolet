@@ -127,6 +127,59 @@ func (p *Pool) ExecuteStreaming(ctx context.Context, customerSlug, query string,
 	return n, w.WriteCommandComplete(commandTag(query, n))
 }
 
+// ExecuteRows runs SQL on the customer's DuckDB worker and returns the result as
+// string-encoded columns + rows (JSON-friendly), the total row count, and the
+// approximate bytes produced (sum of encoded cell sizes — a real measured
+// quantity used as the warehouse-equivalent "bytes scanned" for cost). Display
+// rows are capped at maxDisplayRows; counting + byte-summing continue for the
+// full result (bounded by the 30s context). This powers the in-app Workbench so
+// a query runs on the SAME engine the proxy uses — no mock execution.
+func (p *Pool) ExecuteRows(ctx context.Context, customerSlug, query string) (cols []string, rows [][]string, rowCount int64, bytesScanned int64, err error) {
+	const maxDisplayRows = 1000
+	wk, err := p.workerFor(ctx, customerSlug)
+	if err != nil {
+		return nil, nil, 0, 0, err
+	}
+	cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	rs, err := wk.db.QueryContext(cctx, query)
+	if err != nil {
+		return nil, nil, 0, 0, fmt.Errorf("duckdb query: %w", err)
+	}
+	defer rs.Close()
+
+	cols, err = rs.Columns()
+	if err != nil {
+		return nil, nil, 0, 0, err
+	}
+	scan := make([]interface{}, len(cols))
+	ptrs := make([]interface{}, len(cols))
+	for i := range scan {
+		ptrs[i] = &scan[i]
+	}
+	rows = [][]string{}
+	for rs.Next() {
+		if err := rs.Scan(ptrs...); err != nil {
+			return cols, rows, rowCount, bytesScanned, err
+		}
+		rec := make([]string, len(cols))
+		for i, v := range scan {
+			b := encodeDuckDBValue(v)
+			bytesScanned += int64(len(b))
+			rec[i] = string(b)
+		}
+		if rowCount < maxDisplayRows {
+			rows = append(rows, rec)
+		}
+		rowCount++
+	}
+	if err := rs.Err(); err != nil {
+		return cols, rows, rowCount, bytesScanned, err
+	}
+	return cols, rows, rowCount, bytesScanned, nil
+}
+
 func (p *Pool) workerFor(ctx context.Context, slug string) (*worker, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()

@@ -21,6 +21,10 @@ export const SUPPORTED_LOCALES: { code: Locale; label: string }[] = [
 ];
 
 const FALLBACK_EN: Record<string, string> = {
+  "nav.foundational": "Foundational",
+  "nav.cost_optimization": "Cost Optimization",
+  "nav.pull_requests": "Pull Requests",
+  "nav.github_app": "GitHub App",
   "nav.savings": "Savings",
   "nav.connections": "Connections",
   "nav.sync": "Sync",

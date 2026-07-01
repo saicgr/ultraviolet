@@ -6,6 +6,15 @@ Authoritative list of every doc in `docs/`. Organized by **consumption topic** (
 
 ---
 
+## Getting started — run + test locally (start here)
+
+| Doc | Purpose |
+|---|---|
+| [`../SETUP.md`](../SETUP.md) | Local setup: prerequisites, env vars, and `make up` (whole webapp on an embedded Postgres + seeded data, no Docker/cloud) |
+| [`../TEST.md`](../TEST.md) | How to test: `make up` (browser), `make verify-localdb` (real-Postgres e2e), `make verify-external` (live DuckDB + PR analysis on a real git diff), and what each proves |
+
+---
+
 ## `strategy/` — Business + market context (rare reads)
 
 | Doc | Purpose |

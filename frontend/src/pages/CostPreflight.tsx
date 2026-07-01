@@ -43,21 +43,31 @@ export function CostPreflight() {
           <CardHeader title="Result" />
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-foreground/60">Estimated bytes</span>
-              <span className="font-mono">{preflight.data.estimated_bytes.toLocaleString()}</span>
+              <span className="text-foreground/60">Estimated bytes scanned</span>
+              <span className="font-mono">{(preflight.data.estimated_bytes_scanned ?? 0).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-foreground/60">Estimated cost</span>
-              <span className="font-mono">${preflight.data.estimated_cost_usd.toFixed(4)}</span>
+              <span className="font-mono">${(preflight.data.estimated_cost_usd ?? 0).toFixed(4)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-foreground/60">Warehouse</span>
+              <span className="font-mono">{preflight.data.warehouse ?? "—"}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-foreground/60">Would block</span>
-              <Badge variant={preflight.data.would_block ? "danger" : "success"}>
-                {preflight.data.would_block ? "yes" : "no"}
+              <Badge variant={preflight.data.would_block_if_over_budget ? "danger" : "success"}>
+                {preflight.data.would_block_if_over_budget ? "yes" : "no"}
               </Badge>
             </div>
-            {preflight.data.reason && (
-              <div className="pt-2 text-foreground/70">{preflight.data.reason}</div>
+            {preflight.data.budget_reason && (
+              <div className="pt-2 text-foreground/70">{preflight.data.budget_reason}</div>
+            )}
+            {preflight.data.unknown_tables && preflight.data.unknown_tables.length > 0 && (
+              <div className="pt-2 text-foreground/70">
+                <span className="text-foreground/60">Unknown tables (no synced stats, estimated at 0 bytes): </span>
+                <span className="font-mono">{preflight.data.unknown_tables.join(", ")}</span>
+              </div>
             )}
           </div>
         </Card>

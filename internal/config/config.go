@@ -42,6 +42,17 @@ type Config struct {
 	APIRateLimitRPS    int
 	AICallsPerCustomer int
 	SnowflakeUSDPerTiB float64
+	BigQueryUSDPerTiB  float64
+	Prod               bool // UV_PROD=true disables all dev backdoors (auth bypass, weak secrets)
+
+	// GitHub App (W2). PrivateKeyPEM is read from UV_GITHUB_PRIVATE_KEY or, if
+	// that is empty, the file at UV_GITHUB_PRIVATE_KEY_PATH.
+	GitHubAppID            int64
+	GitHubAppSlug          string // for the install URL: github.com/apps/<slug>/installations/new
+	GitHubPrivateKeyPEM    []byte
+	GitHubWebhookSecret    string
+	GitHubSetupRedirectURL string
+	LineageBotPort         int
 }
 
 func Load() (*Config, error) {
@@ -74,6 +85,29 @@ func Load() (*Config, error) {
 		APIRateLimitRPS:    envInt("UV_API_RATE_LIMIT_RPS", 100),
 		AICallsPerCustomer: envInt("UV_AI_CALLS_PER_CUSTOMER", 1000),
 		SnowflakeUSDPerTiB: envFloat("UV_SF_USD_PER_TIB", 5.0),
+		BigQueryUSDPerTiB:  envFloat("UV_BQ_USD_PER_TIB", 6.25),
+		Prod:               envBool("UV_PROD", false),
+
+		GitHubAppID:            int64(envInt("UV_GITHUB_APP_ID", 0)),
+		GitHubAppSlug:          os.Getenv("UV_GITHUB_APP_SLUG"),
+		GitHubWebhookSecret:    os.Getenv("UV_GITHUB_WEBHOOK_SECRET"),
+		GitHubSetupRedirectURL: env("UV_GITHUB_SETUP_REDIRECT_URL", "http://localhost:5173/github"),
+		LineageBotPort:         envInt("UV_LINEAGE_BOT_PORT", 8090),
+	}
+	if pem := os.Getenv("UV_GITHUB_PRIVATE_KEY"); pem != "" {
+		c.GitHubPrivateKeyPEM = []byte(pem)
+	} else if path := os.Getenv("UV_GITHUB_PRIVATE_KEY_PATH"); path != "" {
+		if b, err := os.ReadFile(path); err == nil {
+			c.GitHubPrivateKeyPEM = b
+		}
+	}
+
+	// Production must never run with dev backdoors. Fail closed at boot.
+	if c.Prod {
+		c.APIRequireAuth = true // the X-UV-Dev-Bypass header is also ignored in api.authMiddleware when Prod
+		if c.JWTSecret == "dev-jwt-secret-change-me" {
+			return nil, fmt.Errorf("JWT_SECRET is the dev default; refusing to boot with UV_PROD=true")
+		}
 	}
 
 	keyHex := env("ENCRYPTION_KEY", strings.Repeat("0", 64))
@@ -84,7 +118,7 @@ func Load() (*Config, error) {
 	if len(key) != 32 {
 		return nil, fmt.Errorf("ENCRYPTION_KEY must decode to 32 bytes (got %d)", len(key))
 	}
-	if isAllZero(key) && envBool("UV_PROD", false) {
+	if isAllZero(key) && c.Prod {
 		return nil, fmt.Errorf("ENCRYPTION_KEY is the all-zero default; refusing to boot with UV_PROD=true")
 	}
 	c.EncryptionKey = key

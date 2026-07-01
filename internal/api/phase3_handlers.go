@@ -142,20 +142,6 @@ func (s *Server) createDashboard(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]uuid.UUID{"id": newID})
 }
 
-func (s *Server) workbenchRun(w http.ResponseWriter, r *http.Request) {
-	// Phase-1 stub: the workbench page demonstrates the route. Real impl forwards
-	// the SQL through the proxy via psql-DSN-on-loopback so the same router applies.
-	var body struct {
-		SQL string `json:"sql"`
-	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"sql":  body.SQL,
-		"rows": []any{},
-		"hint": "connect via psql -h localhost -p 5000 -U <slug> -d <slug>_bigquery",
-	})
-}
-
 func (s *Server) impactPreview(w http.ResponseWriter, r *http.Request) {
 	cid, err := s.activeCustomer(r)
 	if err != nil {

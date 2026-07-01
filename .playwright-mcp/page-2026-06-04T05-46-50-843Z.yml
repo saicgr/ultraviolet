@@ -1,0 +1,102 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]: Ultraviolet
+    - navigation [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e9]: Foundational
+        - link "Cost Optimization" [ref=e10] [cursor=pointer]:
+          - /url: /
+        - link "Dashboards" [ref=e11] [cursor=pointer]:
+          - /url: /dashboards
+        - link "Lineage" [ref=e12] [cursor=pointer]:
+          - /url: /lineage
+        - link "Pull Requests" [ref=e13] [cursor=pointer]:
+          - /url: /pull-requests
+        - link "GitHub App" [ref=e14] [cursor=pointer]:
+          - /url: /github
+      - generic [ref=e15]:
+        - link "Connections" [ref=e16] [cursor=pointer]:
+          - /url: /connections
+        - link "Sync" [ref=e17] [cursor=pointer]:
+          - /url: /sync
+        - link "Queries" [ref=e18] [cursor=pointer]:
+          - /url: /queries
+        - link "Catalog" [ref=e19] [cursor=pointer]:
+          - /url: /catalog
+        - link "Workbench" [ref=e20] [cursor=pointer]:
+          - /url: /workbench
+        - link "Impact" [ref=e21] [cursor=pointer]:
+          - /url: /impact
+        - link "Agents" [ref=e22] [cursor=pointer]:
+          - /url: /agents
+        - link "Activity" [ref=e23] [cursor=pointer]:
+          - /url: /activity
+        - link "Inbox" [ref=e24] [cursor=pointer]:
+          - /url: /inbox
+        - link "Subscriptions" [ref=e25] [cursor=pointer]:
+          - /url: /subscriptions
+        - link "Webhooks" [ref=e26] [cursor=pointer]:
+          - /url: /webhooks
+        - link "Scheduled Queries" [ref=e27] [cursor=pointer]:
+          - /url: /scheduled-queries
+        - link "Access Reviews" [ref=e28] [cursor=pointer]:
+          - /url: /access-reviews
+        - link "Copilot" [ref=e29] [cursor=pointer]:
+          - /url: /copilot
+        - link "Narrator" [ref=e30] [cursor=pointer]:
+          - /url: /narrator
+        - link "Lineage Watches" [ref=e31] [cursor=pointer]:
+          - /url: /watches
+        - link "Catalog Hover" [ref=e32] [cursor=pointer]:
+          - /url: /catalog/hover
+        - link "Semantic Search" [ref=e33] [cursor=pointer]:
+          - /url: /semantic-search
+        - link "Quotas" [ref=e34] [cursor=pointer]:
+          - /url: /quotas
+        - link "Approvals" [ref=e35] [cursor=pointer]:
+          - /url: /approvals
+        - link "Schema Diff" [ref=e36] [cursor=pointer]:
+          - /url: /schema-diff
+        - link "Sync DAG" [ref=e37] [cursor=pointer]:
+          - /url: /sync-dag
+        - link "Dashboard Versions" [ref=e38] [cursor=pointer]:
+          - /url: /dashboard-versions
+        - link "Cost Preflight" [ref=e39] [cursor=pointer]:
+          - /url: /cost-preflight
+        - link "API Keys" [ref=e40] [cursor=pointer]:
+          - /url: /api-keys
+        - link "Connect" [ref=e41] [cursor=pointer]:
+          - /url: /connection-string
+  - main [ref=e42]:
+    - generic [ref=e43]:
+      - button "Open command palette" [ref=e44] [cursor=pointer]: Search… ⌘K
+      - combobox "Locale" [ref=e45]:
+        - option "English" [selected]
+        - option "Español"
+        - option "Français"
+        - option "Deutsch"
+        - option "日本語"
+    - generic [ref=e46]:
+      - heading "Subscriptions" [level=1] [ref=e47]
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - heading "Pick a dashboard" [level=2] [ref=e50]
+          - paragraph [ref=e51]: Email subscriptions deliver rendered dashboards on a cron.
+        - combobox [ref=e52]:
+          - option "Select a dashboard…"
+          - option "Exec Overview" [selected]
+          - option "Word Trends"
+      - generic [ref=e53]:
+        - heading "Add subscription" [level=2] [ref=e55]
+        - generic [ref=e56]:
+          - textbox "email@team.com" [ref=e57]
+          - textbox "cron e.g. 0 9 * * 1" [ref=e58]: 0 9 * * 1
+          - combobox [ref=e59]:
+            - option "PDF" [selected]
+            - option "PNG"
+            - option "CSV"
+        - generic [ref=e60]:
+          - button "Create" [disabled]
+      - generic [ref=e61]:
+        - heading "Existing subscriptions" [level=2] [ref=e63]
+        - status "Loading" [ref=e64]

@@ -31,6 +31,9 @@ export function Dashboard() {
 
   if (savings.isError) return <ErrorState error={savings.error} />;
   const total = savings.data?.reduce((a, r) => a + r.estimated_savings_usd, 0) ?? 0;
+  // Adaptive precision: small (real) savings from a few queries are sub-cent —
+  // show enough digits that they're visible rather than rounding to $0.00.
+  const totalStr = total >= 1 || total === 0 ? total.toFixed(2) : total.toFixed(6);
   const totalQ = queries.data?.reduce((a, r) => a + r.count, 0) ?? 0;
   const duckQ = queries.data?.find((r) => r.route === "duckdb")?.count ?? 0;
   const pct = totalQ ? ((duckQ / totalQ) * 100).toFixed(1) : "0";
@@ -41,7 +44,7 @@ export function Dashboard() {
       <div className="grid grid-cols-3 gap-4">
         <Card>
           <CardHeader title="Estimated 30-day savings" />
-          <div className="text-3xl font-semibold">${total.toFixed(2)}</div>
+          <div className="text-3xl font-semibold">${totalStr}</div>
         </Card>
         <Card>
           <CardHeader title="DuckDB hit rate" />

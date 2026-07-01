@@ -18,6 +18,7 @@ import (
 	"github.com/ultraviolet-dev/ultraviolet/internal/ai"
 	"github.com/ultraviolet-dev/ultraviolet/internal/config"
 	"github.com/ultraviolet-dev/ultraviolet/internal/connectors"
+	"github.com/ultraviolet-dev/ultraviolet/internal/lineage"
 	"github.com/ultraviolet-dev/ultraviolet/internal/logger"
 	"github.com/ultraviolet-dev/ultraviolet/internal/protocols/pgwire"
 	"github.com/ultraviolet-dev/ultraviolet/internal/router"
@@ -37,8 +38,26 @@ type Handler struct {
 	rt          *router.Router
 	aiRewriter  *ai.Rewriter
 
+	// Runtime lineage capture. Every successfully-executed query is enqueued
+	// (non-blocking) onto lineageCh; a single background consumer extracts +
+	// persists edges off the request hot path under a bounded context. The
+	// queue is intentionally lossy under sustained overload (drop + log) so
+	// lineage capture can never back-pressure or stall query serving.
+	lineageEx   *lineage.Extractor
+	lineageW    *lineage.Writer
+	lineageCh   chan lineageJob
+	lineageQuit chan struct{}
+	lineageOnce sync.Once
+
 	mu              sync.RWMutex
 	connsByCustomer map[string]connectors.Connector
+}
+
+// lineageJob is a unit of deferred runtime-lineage work: the executed SQL and
+// the tenant it ran for. customerID is always the real tenant — never zero.
+type lineageJob struct {
+	customerID uuid.UUID
+	sql        string
 }
 
 func New(ctx context.Context, cfg *config.Config, db *store.DB, enc *store.Encryptor, log zerolog.Logger) (*Handler, error) {
@@ -54,7 +73,7 @@ func New(ctx context.Context, cfg *config.Config, db *store.DB, enc *store.Encry
 	if err != nil {
 		return nil, fmt.Errorf("ai rewriter: %w", err)
 	}
-	return &Handler{
+	h := &Handler{
 		cfg:             cfg,
 		db:              db,
 		enc:             enc,
@@ -63,11 +82,53 @@ func New(ctx context.Context, cfg *config.Config, db *store.DB, enc *store.Encry
 		pool:            pool,
 		rt:              router.New(db, log),
 		aiRewriter:      rew,
+		lineageEx:       lineage.NewExtractor(),
+		lineageW:        lineage.NewWriter(db.Pool()),
+		lineageCh:       make(chan lineageJob, 256),
+		lineageQuit:     make(chan struct{}),
 		connsByCustomer: map[string]connectors.Connector{},
-	}, nil
+	}
+	go h.lineageConsumer()
+	return h, nil
+}
+
+// lineageConsumer drains lineageCh until Close() signals quit, extracting +
+// persisting runtime lineage one query at a time under a 30s bounded context
+// (CLAUDE.md goroutine discipline: never on the proxy main goroutine, always
+// context.WithTimeout ≤30s). Errors are logged, not propagated — lineage is
+// best-effort and must never affect query serving.
+func (h *Handler) lineageConsumer() {
+	for {
+		select {
+		case <-h.lineageQuit:
+			return
+		case job := <-h.lineageCh:
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			skipped, err := lineage.RecordQuery(ctx, h.lineageEx, h.lineageW, job.customerID, job.sql)
+			cancel()
+			switch {
+			case skipped:
+				h.log.Debug().Str("customer", job.customerID.String()).Msg("lineage: skipped oversized SQL")
+			case err != nil:
+				h.log.Warn().Err(err).Str("customer", job.customerID.String()).Msg("lineage: record failed")
+			}
+		}
+	}
+}
+
+// captureLineage enqueues a successfully-executed query for deferred lineage
+// extraction. Non-blocking: if the consumer is saturated we drop and log rather
+// than stall the hot path.
+func (h *Handler) captureLineage(customerID uuid.UUID, sql string) {
+	select {
+	case h.lineageCh <- lineageJob{customerID: customerID, sql: sql}:
+	default:
+		h.log.Debug().Str("customer", customerID.String()).Msg("lineage: queue full, dropping")
+	}
 }
 
 func (h *Handler) Close() {
+	h.lineageOnce.Do(func() { close(h.lineageQuit) })
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for _, c := range h.connsByCustomer {
@@ -99,6 +160,7 @@ func (h *Handler) execute(ctx context.Context, sess *pgwire.Session, sql string,
 	}
 	hash := sqlHash(sql)
 	normalized := logger.NormalizeSQL(sql)
+	origSQL := sql // pre-rewrite SQL: what the user referenced, matches normalized_sql for lineage
 
 	// 1. AI-rewriter pass (may transform SQL).
 	if h.aiRewriter != nil {
@@ -168,6 +230,8 @@ func (h *Handler) execute(ctx context.Context, sess *pgwire.Session, sql string,
 		DurationMS:     dur,
 		RowsReturned:   rowsReturned,
 	})
+	// Capture runtime lineage off the hot path with the REAL tenant id.
+	h.captureLineage(id.CustomerID, origSQL)
 	return nil
 }
 
